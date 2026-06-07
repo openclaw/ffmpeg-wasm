@@ -18,7 +18,7 @@ Keep these pieces conceptually separate:
 
 ## Current Build Choices
 
-The build includes LAME for MP3 output and keeps FFmpeg itself configured without GPL or nonfree flags. Video compression presets that require GPL encoders are intentionally not included.
+The build includes LAME for MP3 output and FFmpeg's native MPEG-4 encoder for lightweight MP4 downscales. FFmpeg stays configured without GPL or nonfree flags.
 
 ## Distribution
 

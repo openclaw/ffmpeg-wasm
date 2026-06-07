@@ -29,6 +29,12 @@ ffmpeg-wasm -hide_banner -loglevel error -i input.mp4 -vn -ac 1 -ar 16000 -sampl
 ffmpeg-wasm -hide_banner -loglevel error -ss 1 -i input.mp4 -frames:v 1 -vf scale=1280:-2 poster.png
 ```
 
+## Downscale Video
+
+```sh
+ffmpeg-wasm -hide_banner -loglevel error -ss 0 -i input.mp4 -t 5 -vf scale=1280:-2,format=yuv420p -c:v mpeg4 -q:v 5 -an -movflags +faststart smaller.mp4
+```
+
 ## Emit a Tiny Raw Frame Hash Input
 
 ```sh

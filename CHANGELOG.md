@@ -14,11 +14,11 @@
 - Added media support for inspection, audio extraction, thumbnails, rawvideo pipe output, stdin/stdout pipe I/O, and segmentation.
 - Added MP4/MOV muxer support for lossless stream-copy clips with faststart metadata.
 - Added local one-page media playground with source preview, preset builder, generated FFmpeg args, inline output preview, and browser save/download flow.
-- Added public `ffmpeg.sh` workbench root with editable FFmpeg command text, GitHub and docs actions, sample loading, and browser-side preview fallbacks.
-- Added workbench video downscale controls with width and quality presets, selectable MP3 command setup, and source-video seek syncing for poster-frame selection.
-- Added Chrome-driven playground E2E smoke test that loads the sample video, renders an MP4 clip, and writes a screenshot artifact.
+- Added public `ffmpeg.sh` workbench root with editable FFmpeg command text, GitHub and docs actions, sample loading, and inline output previews.
+- Added ffmpac-backed workbench video downscale controls with width and quality presets, selectable MP3 rendering, and source-video seek syncing for poster-frame selection.
+- Added Chrome-driven playground E2E smoke test that loads the sample video, renders a smaller MP4 and MP3, and writes a screenshot artifact.
 - Added GitHub Pages documentation source, static site builder, `ffmpeg.sh` CNAME, feature docs, and README playground screenshot.
-- Added enabled codecs, demuxers, muxers, filters, protocols, and external libraries tuned for a small local media toolchain.
+- Added enabled codecs, demuxers, muxers, filters, protocols, and external libraries tuned for a small local media toolchain, including native MPEG-4 video encoding for lightweight MP4 downscales.
 - Added generated license copying so FFmpeg license files ship next to generated wasm assets in `dist/`.
 - Added README guidance for the MIT wrapper code and LGPL generated FFmpeg assets.
 - Added README usage docs for build prerequisites, CLI commands, TypeScript APIs, package linking, build tuning, and downstream wrapper wiring.
@@ -28,4 +28,4 @@
 - Added live verification harness covering FFprobe text and JSON output, WAV and MP3 extraction, stdin pipes, stdout pipes, PNG frame output, rawvideo byte equality, segmentation, cwd and dist overrides, API validation failures, and CLI success and failure paths.
 - Added `pnpm test:e2e` to rebuild wasm assets from source and run the live verifier.
 - Added GitHub Actions CI for quality checks and full live wasm E2E on Node 24 with Emscripten, build caching, and `dist` artifact upload.
-- Verified current generated `dist/` size at about 7.3 MB.
+- Verified current generated `dist/` size at about 8.1 MB.

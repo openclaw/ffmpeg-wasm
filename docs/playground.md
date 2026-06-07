@@ -15,13 +15,15 @@ Then open `http://127.0.0.1:4173`.
 
 ![Media Bench playground](assets/media-bench.png)
 
+The workbench is a ffmpac test surface. It does not use browser-native media encoders as a substitute; a static copy without the local backend disables rendering controls.
+
 ## What It Does
 
 - Opens local video or audio files.
 - Generates a sample MP4 when native `ffmpeg` is installed.
 - Probes duration, codec, audio, and size.
 - Shows FFmpeg args before rendering.
-- Renders through this package's wasm wrapper when the local backend supports the operation.
+- Renders through this package's wasm wrapper.
 - Offers a smaller-video preset with output width and quality controls.
 - Previews video, image, audio, or raw output inline.
 - Saves through the browser file picker when available, with a download fallback.
@@ -30,15 +32,15 @@ Then open `http://127.0.0.1:4173`.
 ## Presets
 
 - Lossless MP4 clip.
-- Smaller WebM video.
+- Smaller MP4 video.
 - Poster PNG.
 - MP3 extract.
 - WAV extract.
 - 32 x 32 grayscale raw frame.
 
-`MP3 extract` is selectable everywhere so you can build or copy the command. Rendering MP3 needs the local `pnpm playground` backend because browsers do not provide MP3 encoding through the workbench fallback path.
+`MP3 extract` is a normal ffmpac render path using the bundled LAME encoder.
 
-`Smaller WebM video` uses the browser preview renderer in this build. The generated command shows the equivalent desktop FFmpeg shape for a VP9 WebM downscale, while the current lightweight wasm bundle avoids shipping a video encoder.
+`Smaller MP4 video` downscales with FFmpeg's native MPEG-4 encoder. The quality menu maps to `-q:v`, where Small uses a higher quantizer and High uses a lower quantizer.
 
 ## Local Safety
 

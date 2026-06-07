@@ -47,8 +47,10 @@ The build intentionally starts from `--disable-all` and enables only the pieces 
 
 - `aac`
 - `flac`
+- `h263`
 - `h264`
 - `hevc`
+- `mpeg4`
 - `mjpeg`
 - `mp3`
 - `opus`
@@ -61,6 +63,8 @@ The build intentionally starts from `--disable-all` and enables only the pieces 
 ## Encoders
 
 - `libmp3lame`
+- `h263`
+- `mpeg4`
 - `pcm_s16le`
 - `png`
 - `rawvideo`

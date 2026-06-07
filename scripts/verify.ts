@@ -14,6 +14,7 @@ try {
   const wav = join(work, "audio.wav");
   const mp3 = join(work, "audio.mp3");
   const clip = join(work, "clip.mp4");
+  const resized = join(work, "resized.mp4");
   const png = join(work, "frame.png");
   const raw = join(work, "hash.raw");
   const relativeCwd = join(work, "relative-cwd");
@@ -82,6 +83,7 @@ try {
     ]),
   );
   await step("mp4 stream-copy clip", () => okMp4Clip(input, clip));
+  await step("mp4 resize transcode", () => okMp4Resize(input, resized));
   await step("relative cwd output", () => okRelativeCwdOutput(input, relativeCwd, relativeWav));
   await step("API wav stdin pipe", () => okWavStdin(wav));
   await step("exec wav stdin pipe", () => okExecWavStdin(wav));
@@ -185,6 +187,7 @@ try {
   assertFile(wav, 1024, "wav transcode");
   assertFile(mp3, 1024, "mp3 transcode");
   assertFile(clip, 1024, "mp4 stream-copy clip");
+  assertFile(resized, 1024, "mp4 resize transcode");
   assertFile(join(relativeCwd, relativeWav), 1024, "relative cwd transcode");
   assertFile(png, 1024, "png frame");
   assertFile(raw, 1024, "raw hash frame");
@@ -318,6 +321,54 @@ async function okMp4Clip(input: string, output: string) {
     output,
   ]);
   await okProbe(output);
+}
+
+async function okMp4Resize(input: string, output: string) {
+  await okFfmpeg([
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-ss",
+    "0.2",
+    "-i",
+    input,
+    "-t",
+    "1",
+    "-vf",
+    "scale=80:-2,format=yuv420p",
+    "-c:v",
+    "mpeg4",
+    "-q:v",
+    "5",
+    "-an",
+    "-movflags",
+    "+faststart",
+    output,
+  ]);
+  await okProbeVideoSize(output, 80, 46);
+}
+
+async function okProbeVideoSize(input: string, width: number, height: number) {
+  const result = await runFfprobe(
+    [
+      "-v",
+      "quiet",
+      "-print_format",
+      "json",
+      "-show_entries",
+      "stream=codec_type,width,height",
+      input,
+    ],
+    { timeoutMs: 30_000 },
+  );
+  if (result.exitCode !== 0) {
+    fail("ffprobe video size", result);
+  }
+  const parsed = parseProbeJson(result.stdoutText);
+  const video = parsed.streams.find((stream) => stream.codec_type === "video");
+  if (!video || video.width !== width || video.height !== height) {
+    throw new Error(`bad video size: ${String(video?.width)}x${String(video?.height)}`);
+  }
 }
 
 async function okRelativeCwdOutput(input: string, cwd: string, output: string) {

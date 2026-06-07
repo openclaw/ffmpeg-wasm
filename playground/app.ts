@@ -1,4 +1,4 @@
-type Operation = "audio-mp3" | "audio-wav" | "clip-mp4" | "hash-raw" | "poster-png" | "video-webm";
+type Operation = "audio-mp3" | "audio-wav" | "clip-mp4" | "hash-raw" | "poster-png" | "video-mp4";
 export type WorkbenchOperation = Operation;
 type StatusMode = "busy" | "error" | "idle";
 
@@ -32,7 +32,6 @@ function isProbeResult(value: unknown): value is ProbeResult {
 
 interface RenderOutput {
   blob: Blob;
-  browserFallback?: boolean;
   ffmpegArgs?: string | null;
   name: string;
   url?: string;
@@ -54,12 +53,6 @@ interface WorkbenchState {
   probe: ProbeResult | null;
 }
 
-interface BrowserMetadata {
-  duration: number;
-  videoHeight?: number;
-  videoWidth?: number;
-}
-
 interface BrowserFileHandle {
   createWritable: () => Promise<{
     close: () => Promise<void>;
@@ -75,23 +68,6 @@ interface BrowserSaveOptions {
     accept: Record<string, string[]>;
     description: string;
   }[];
-}
-
-interface RenderOptions {
-  allowFallback?: boolean;
-}
-
-interface VideoFrame {
-  canvas: HTMLCanvasElement;
-  context: CanvasRenderingContext2D;
-}
-
-interface VideoWithCaptureStream extends HTMLVideoElement {
-  captureStream: () => MediaStream;
-}
-
-interface CanvasWithCaptureStream extends HTMLCanvasElement {
-  captureStream: (frameRate?: number) => MediaStream;
 }
 
 type BrowserGlobal = typeof globalThis & {
@@ -110,9 +86,9 @@ const presets: Preset[] = [
     tone: "green",
   },
   {
-    detail: "Downscaled WebM",
-    extension: ".webm",
-    id: "video-webm",
+    detail: "Downscaled MP4",
+    extension: ".mp4",
+    id: "video-mp4",
     name: "Smaller video",
     tone: "green",
   },
@@ -236,6 +212,7 @@ renderPresets();
 bindEvents();
 updateControls();
 updateCommand();
+configureBackendAvailability();
 
 function bindEvents() {
   elements.fileInput.addEventListener(
@@ -286,6 +263,19 @@ function bindEvents() {
   }
 }
 
+function configureBackendAvailability() {
+  if (hasBackend()) {
+    return;
+  }
+  elements.sampleButton.disabled = true;
+  elements.fileInput.disabled = true;
+  elements.renderButton.disabled = true;
+  elements.renderSaveButton.disabled = true;
+  elements.sourceViewer.className = "media-frame empty";
+  elements.sourceViewer.replaceChildren(textNode("ffmpac backend required"));
+  setStatus("ffmpac backend unavailable", "error");
+}
+
 function renderPresets() {
   elements.presetList.replaceChildren(
     ...presets.map((preset) => {
@@ -294,9 +284,6 @@ function renderPresets() {
       button.dataset.operation = preset.id;
       button.dataset.testid = `preset-${preset.id}`;
       button.dataset.tone = preset.tone;
-      if (preset.id === "audio-mp3" && !hasBackend()) {
-        button.title = "MP3 rendering needs the local wasm backend; command setup still works.";
-      }
       button.type = "button";
       button.innerHTML = `
         <span class="preset-mark" aria-hidden="true"></span>
@@ -320,24 +307,16 @@ function renderPresets() {
 
 async function loadSample() {
   setStatus("Loading sample", "busy");
-  try {
-    if (!hasBackend()) {
-      throw new Error("Static workbench sample");
-    }
-    const response = await fetch("/api/sample", { headers: playgroundHeaders() });
-    if (!response.ok) {
-      await failFromResponse(response);
-    }
-    const blob = await response.blob();
-    await setSourceFile(new File([blob], "sample.mp4", { type: "video/mp4" }));
-  } catch {
-    try {
-      await setSourceFile(await browserSampleFile());
-      setStatus("Ready", "idle");
-    } catch (error) {
-      setStatus(errorMessage(error), "error");
-    }
+  if (!hasBackend()) {
+    setStatus("ffmpac backend unavailable", "error");
+    return;
   }
+  const response = await fetch("/api/sample", { headers: playgroundHeaders() });
+  if (!response.ok) {
+    await failFromResponse(response);
+  }
+  const blob = await response.blob();
+  await setSourceFile(new File([blob], "sample.mp4", { type: "video/mp4" }));
 }
 
 async function setSourceFile(file: File) {
@@ -367,30 +346,26 @@ async function setSourceFile(file: File) {
 }
 
 async function probeFile(file: File): Promise<ProbeResult> {
-  try {
-    if (!hasBackend()) {
-      throw new Error("Static workbench probe");
-    }
-    const response = await fetch("/api/probe", {
-      body: file,
-      headers: {
-        "Content-Type": "application/octet-stream",
-        ...playgroundHeaders(),
-        "X-File-Name": safeHeaderName(file.name),
-      },
-      method: "POST",
-    });
-    if (!response.ok) {
-      await failFromResponse(response);
-    }
-    const parsed: unknown = await response.json();
-    if (!isProbeResult(parsed)) {
-      throw new Error("Invalid probe response");
-    }
-    return parsed;
-  } catch {
-    return probeFileInBrowser(file);
+  if (!hasBackend()) {
+    throw new Error("ffmpac backend unavailable");
   }
+  const response = await fetch("/api/probe", {
+    body: file,
+    headers: {
+      "Content-Type": "application/octet-stream",
+      ...playgroundHeaders(),
+      "X-File-Name": safeHeaderName(file.name),
+    },
+    method: "POST",
+  });
+  if (!response.ok) {
+    await failFromResponse(response);
+  }
+  const parsed: unknown = await response.json();
+  if (!isProbeResult(parsed)) {
+    throw new Error("Invalid probe response");
+  }
+  return parsed;
 }
 
 async function renderOutput(saveAfterRender: boolean) {
@@ -421,7 +396,7 @@ async function renderOutput(saveAfterRender: boolean) {
   elements.renderButton.disabled = true;
   elements.renderSaveButton.disabled = true;
   try {
-    const rendered = await renderWithBestBackend({ allowFallback: saveHandle === null });
+    const rendered = await renderWithBackend();
     setLastOutput(rendered);
     if (saveHandle !== null) {
       await writeBlobToHandle(saveHandle, rendered.blob);
@@ -430,7 +405,7 @@ async function renderOutput(saveAfterRender: boolean) {
       downloadBlob(rendered.blob, rendered.name);
       setStatus("Downloaded", "idle");
     } else {
-      setStatus(rendered.browserFallback === true ? "Rendered in browser" : "Rendered", "idle");
+      setStatus("Rendered", "idle");
     }
   } catch (error) {
     setStatus(errorMessage(error), "error");
@@ -578,7 +553,7 @@ function updateControls() {
   for (const field of document.querySelectorAll(".clip-field")) {
     field.classList.toggle(
       "hidden",
-      state.operation !== "clip-mp4" && state.operation !== "video-webm",
+      state.operation !== "clip-mp4" && state.operation !== "video-mp4",
     );
   }
   for (const field of document.querySelectorAll(".frame-field")) {
@@ -592,11 +567,11 @@ function updateControls() {
       "hidden",
       state.operation !== "poster-png" &&
         state.operation !== "hash-raw" &&
-        state.operation !== "video-webm",
+        state.operation !== "video-mp4",
     );
   }
   for (const field of document.querySelectorAll(".video-quality-field")) {
-    field.classList.toggle("hidden", state.operation !== "video-webm");
+    field.classList.toggle("hidden", state.operation !== "video-mp4");
   }
   for (const field of document.querySelectorAll(".audio-field")) {
     field.classList.toggle(
@@ -619,91 +594,46 @@ function displayCommand() {
   return ["ffmpeg", ...buildDisplayArgs()].map((value) => quoteShell(value)).join(" ");
 }
 
-async function renderWithBestBackend(options: RenderOptions = {}): Promise<RenderOutput> {
+async function renderWithBackend(): Promise<RenderOutput> {
   const file = sourceFile();
-  if (state.operation === "video-webm") {
-    return {
-      ...(await renderInBrowser()),
-      browserFallback: true,
-      ffmpegArgs: JSON.stringify(buildDisplayArgs()),
-    };
+  if (!hasBackend()) {
+    throw new Error("ffmpac backend unavailable");
   }
-  try {
-    if (!hasBackend()) {
-      throw new Error("Static workbench render");
-    }
-    const query = buildQuery();
-    const response = await fetch(`/api/render?${query.toString()}`, {
-      body: file,
-      headers: {
-        "Content-Type": "application/octet-stream",
-        ...playgroundHeaders(),
-        "X-File-Name": safeHeaderName(file.name),
-      },
-      method: "POST",
-    });
-    if (!response.ok) {
-      await failFromResponse(response);
-    }
-    return {
-      blob: await response.blob(),
-      ffmpegArgs: response.headers.get("X-Ffmpeg-Args"),
-      name: response.headers.get("X-Output-Name") ?? defaultOutputName(),
-    };
-  } catch (error) {
-    if (options.allowFallback === false) {
-      throw error;
-    }
-    const fallback = await renderInBrowser();
-    return {
-      ...fallback,
-      browserFallback: true,
-      ffmpegArgs: JSON.stringify(buildDisplayArgs()),
-    };
+  const query = buildQuery();
+  const response = await fetch(`/api/render?${query.toString()}`, {
+    body: file,
+    headers: {
+      "Content-Type": "application/octet-stream",
+      ...playgroundHeaders(),
+      "X-File-Name": safeHeaderName(file.name),
+    },
+    method: "POST",
+  });
+  if (!response.ok) {
+    await failFromResponse(response);
   }
-}
-
-function renderInBrowser(): Promise<RenderOutput> {
-  switch (state.operation) {
-    case "clip-mp4": {
-      return renderClipInBrowser();
-    }
-    case "poster-png": {
-      return renderPosterInBrowser();
-    }
-    case "audio-mp3": {
-      throw new Error("MP3 output requires the local wasm backend");
-    }
-    case "audio-wav": {
-      return renderWavInBrowser();
-    }
-    case "video-webm": {
-      return renderWebmInBrowser();
-    }
-    case "hash-raw": {
-      return renderRawFrameInBrowser();
-    }
-    default: {
-      throw new Error("Unsupported operation");
-    }
-  }
+  return {
+    blob: await response.blob(),
+    ffmpegArgs: response.headers.get("X-Ffmpeg-Args"),
+    name: response.headers.get("X-Output-Name") ?? defaultOutputName(),
+  };
 }
 
 function buildQuery() {
   const query = new URLSearchParams({ op: state.operation });
-  if (state.operation === "clip-mp4" || state.operation === "video-webm") {
+  if (state.operation === "clip-mp4" || state.operation === "video-mp4") {
     query.set("start", elements.startInput.value);
     query.set("duration", elements.durationInput.value);
   }
   if (
     state.operation === "poster-png" ||
     state.operation === "hash-raw" ||
-    state.operation === "video-webm"
+    state.operation === "video-mp4"
   ) {
     query.set("frameTime", elements.frameInput.value);
     query.set("width", elements.widthSelect.value);
   }
-  if (state.operation === "video-webm") {
+  if (state.operation === "video-mp4") {
     query.set("quality", elements.qualitySelect.value);
   }
   if (state.operation === "audio-mp3" || state.operation === "audio-wav") {
@@ -749,7 +679,7 @@ function buildDisplayArgs(): string[] {
         "poster.png",
       ];
     }
-    case "video-webm": {
+    case "video-mp4": {
       return [
         "-ss",
         elements.startInput.value,
@@ -758,15 +688,15 @@ function buildDisplayArgs(): string[] {
         "-t",
         elements.durationInput.value,
         "-vf",
-        `scale=${elements.widthSelect.value}:-2`,
+        `scale=${elements.widthSelect.value}:-2,format=yuv420p`,
         "-c:v",
-        "libvpx-vp9",
-        "-crf",
-        videoCrf(elements.qualitySelect.value),
-        "-b:v",
-        "0",
+        "mpeg4",
+        "-q:v",
+        videoQuality(elements.qualitySelect.value),
         "-an",
-        "smaller.webm",
+        "-movflags",
+        "+faststart",
+        "smaller.mp4",
       ];
     }
     case "audio-mp3": {
@@ -818,408 +748,6 @@ function buildDisplayArgs(): string[] {
       throw new Error("Unsupported operation");
     }
   }
-}
-
-function browserSampleFile(): Promise<File> {
-  if (!("MediaRecorder" in globalThis)) {
-    throw new Error("Sample generation is unavailable in this browser");
-  }
-  const canvas = document.createElement("canvas");
-  canvas.width = 960;
-  canvas.height = 540;
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("Canvas rendering is unavailable");
-  }
-  if (!hasCanvasCaptureStream(canvas)) {
-    throw new Error("Sample generation is unavailable in this browser");
-  }
-  const stream = canvas.captureStream(24);
-  const audioContext = new AudioContext();
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  const audioStream = audioContext.createMediaStreamDestination();
-  oscillator.frequency.value = 440;
-  gain.gain.value = 0.05;
-  oscillator.connect(gain);
-  gain.connect(audioStream);
-  oscillator.start();
-  for (const track of audioStream.stream.getAudioTracks()) {
-    stream.addTrack(track);
-  }
-  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-    ? "video/webm;codecs=vp9"
-    : "video/webm";
-  const recorder = new MediaRecorder(stream, { mimeType: mime });
-  const chunks: Blob[] = [];
-  let started = 0;
-  let animation = 0;
-  const paint = (time: number) => {
-    if (started === 0) {
-      started = time;
-    }
-    const elapsed = (time - started) / 1000;
-    context.fillStyle = "#080a08";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#b8e48c";
-    context.fillRect(80 + Math.sin(elapsed * 2) * 40, 120, 280, 160);
-    context.fillStyle = "#9cc7ff";
-    context.fillRect(420, 170 + Math.cos(elapsed * 2.4) * 60, 360, 190);
-    context.fillStyle = "#f4f1e8";
-    context.font = "700 44px sans-serif";
-    context.fillText("ffmpeg.sh sample", 80, 430);
-    animation = requestAnimationFrame(paint);
-  };
-  animation = requestAnimationFrame(paint);
-  return new Promise((resolvePromise, reject) => {
-    recorder.addEventListener("dataavailable", (event) => {
-      if (event.data.size > 0) {
-        chunks.push(event.data);
-      }
-    });
-    recorder.addEventListener(
-      "error",
-      runAsync(async () => {
-        cancelAnimationFrame(animation);
-        oscillator.stop();
-        await closeAudioContext(audioContext);
-        reject(new Error("Sample recording failed"));
-      }),
-    );
-    recorder.addEventListener(
-      "stop",
-      runAsync(async () => {
-        cancelAnimationFrame(animation);
-        oscillator.stop();
-        await closeAudioContext(audioContext);
-        resolvePromise(new File(chunks, "sample.webm", { type: "video/webm" }));
-      }),
-    );
-    recorder.start();
-    setTimeout(() => {
-      recorder.stop();
-    }, 6200);
-  });
-}
-
-async function closeAudioContext(audioContext: AudioContext) {
-  if (audioContext.state !== "closed") {
-    await audioContext.close();
-  }
-}
-
-function hasCanvasCaptureStream(canvas: HTMLCanvasElement): canvas is CanvasWithCaptureStream {
-  return "captureStream" in canvas && typeof canvas.captureStream === "function";
-}
-
-async function probeFileInBrowser(file: File): Promise<ProbeResult> {
-  const meta = await loadMediaMetadata(file);
-  return {
-    format: {
-      duration: String(meta.duration ?? 0),
-    },
-    streams: [
-      ...(meta.videoWidth === undefined
-        ? []
-        : [
-            {
-              codec_name: file.type.includes("webm") ? "webm" : "video",
-              codec_type: "video",
-              height: meta.videoHeight,
-              width: meta.videoWidth,
-            },
-          ]),
-      ...(file.type.startsWith("audio/")
-        ? [
-            {
-              codec_name: "audio",
-              codec_type: "audio",
-            },
-          ]
-        : []),
-    ],
-  };
-}
-
-async function renderPosterInBrowser(): Promise<RenderOutput> {
-  const file = sourceFile();
-  const frame = await videoFrameCanvas(
-    Number(elements.frameInput.value),
-    Number(elements.widthSelect.value),
-  );
-  const blob = await canvasBlob(frame.canvas, "image/png");
-  return { blob, name: `${baseName(file.name)}-poster.png` };
-}
-
-async function renderRawFrameInBrowser(): Promise<RenderOutput> {
-  const file = sourceFile();
-  const frame = await videoFrameCanvas(Number(elements.frameInput.value), 32, 32);
-  const pixels = frame.context.getImageData(0, 0, 32, 32).data;
-  const gray = new Uint8Array(32 * 32);
-  for (let index = 0; index < gray.length; index += 1) {
-    const pixel = index * 4;
-    gray[index] = Math.round(
-      pixels[pixel] * 0.299 + pixels[pixel + 1] * 0.587 + pixels[pixel + 2] * 0.114,
-    );
-  }
-  return {
-    blob: new Blob([gray], { type: "application/octet-stream" }),
-    name: `${baseName(file.name)}-frame-gray.raw`,
-  };
-}
-
-async function renderWebmInBrowser(): Promise<RenderOutput> {
-  if (!("MediaRecorder" in globalThis)) {
-    throw new Error("Browser video rendering is unavailable");
-  }
-  const file = sourceFile();
-  const video = await loadedVideoElement(file);
-  const start = Number(elements.startInput.value);
-  const duration = Number(elements.durationInput.value);
-  const width = Number(elements.widthSelect.value);
-  await seekVideo(video, Math.min(start, Math.max(0, video.duration - 0.1)));
-  video.muted = true;
-  video.playbackRate = 1;
-  const ratio = video.videoWidth === 0 ? 9 / 16 : video.videoHeight / video.videoWidth;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = Math.max(2, Math.round(width * ratio));
-  const context = canvas.getContext("2d");
-  if (!context || !hasCanvasCaptureStream(canvas)) {
-    throw new Error("Browser video rendering is unavailable");
-  }
-  const stream = canvas.captureStream(30);
-  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-    ? "video/webm;codecs=vp9"
-    : "video/webm";
-  const recorder = new MediaRecorder(stream, {
-    mimeType: mime,
-    videoBitsPerSecond: videoBitrate(width, elements.qualitySelect.value),
-  });
-  const chunks: Blob[] = [];
-  let frame = 0;
-  const draw = () => {
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    frame = requestAnimationFrame(draw);
-  };
-  recorder.addEventListener("dataavailable", (event) => {
-    if (event.data.size > 0) {
-      chunks.push(event.data);
-    }
-  });
-  const stopped = once(recorder, "stop");
-  frame = requestAnimationFrame(draw);
-  recorder.start();
-  await video.play();
-  const remainingSeconds = Number.isFinite(video.duration)
-    ? Math.max(0.1, video.duration - video.currentTime)
-    : duration;
-  const recordMs = Math.max(200, Math.min(duration, remainingSeconds) * 1000);
-  await Promise.race([wait(recordMs), once(video, "ended")]);
-  recorder.stop();
-  video.pause();
-  cancelAnimationFrame(frame);
-  await stopped;
-  return {
-    blob: new Blob(chunks, { type: "video/webm" }),
-    name: `${baseName(file.name)}-small.webm`,
-  };
-}
-
-function hasVideoCaptureStream(video: HTMLVideoElement): video is VideoWithCaptureStream {
-  return "captureStream" in video && typeof video.captureStream === "function";
-}
-
-async function renderClipInBrowser(): Promise<RenderOutput> {
-  if (!("MediaRecorder" in globalThis)) {
-    throw new Error("Browser clip rendering is unavailable");
-  }
-  const file = sourceFile();
-  const video = await loadedVideoElement(file);
-  const start = Number(elements.startInput.value);
-  const duration = Number(elements.durationInput.value);
-  await seekVideo(video, Math.min(start, Math.max(0, video.duration - 0.1)));
-  video.muted = true;
-  video.playbackRate = 1;
-  if (!hasVideoCaptureStream(video)) {
-    throw new Error("Browser clip rendering is unavailable");
-  }
-  const stream = video.captureStream();
-  const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
-  const chunks: Blob[] = [];
-  recorder.addEventListener("dataavailable", (event) => {
-    if (event.data.size > 0) {
-      chunks.push(event.data);
-    }
-  });
-  const stopped = once(recorder, "stop");
-  recorder.start();
-  await video.play();
-  await wait(Math.max(200, duration * 1000));
-  recorder.stop();
-  video.pause();
-  await stopped;
-  return {
-    blob: new Blob(chunks, { type: "video/webm" }),
-    name: `${baseName(file.name)}-clip.webm`,
-  };
-}
-
-async function renderWavInBrowser(): Promise<RenderOutput> {
-  const file = sourceFile();
-  const arrayBuffer = await file.arrayBuffer();
-  const audioContext = new AudioContext();
-  try {
-    const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0));
-    const channels = Number(elements.channelsSelect.value);
-    const sampleRate = Number(elements.sampleRateSelect.value);
-    const length = Math.ceil(decoded.duration * sampleRate);
-    const offline = new OfflineAudioContext(channels, length, sampleRate);
-    const source = offline.createBufferSource();
-    source.buffer = decoded;
-    source.connect(offline.destination);
-    source.start();
-    const rendered = await offline.startRendering();
-    return {
-      blob: new Blob([encodeWav(rendered)], { type: "audio/wav" }),
-      name: `${baseName(file.name)}-audio.wav`,
-    };
-  } finally {
-    await audioContext.close();
-  }
-}
-
-async function videoFrameCanvas(
-  seconds: number,
-  width: number,
-  height?: number,
-): Promise<VideoFrame> {
-  const video = await loadedVideoElement(sourceFile());
-  await seekVideo(video, Math.min(Math.max(0, seconds), Math.max(0, video.duration - 0.1)));
-  const ratio = video.videoWidth === 0 ? 9 / 16 : video.videoHeight / video.videoWidth;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height ?? Math.max(2, Math.round(width * ratio));
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("Canvas rendering is unavailable");
-  }
-  context.drawImage(video, 0, 0, canvas.width, canvas.height);
-  return { canvas, context };
-}
-
-async function seekVideo(video: HTMLVideoElement, targetTime: number) {
-  if (Math.abs(video.currentTime - targetTime) < 0.01) {
-    return;
-  }
-  const seeked = once(video, "seeked");
-  video.currentTime = targetTime;
-  await seeked;
-}
-
-async function loadedVideoElement(file: File): Promise<HTMLVideoElement> {
-  const video = document.createElement("video");
-  video.crossOrigin = "anonymous";
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = "metadata";
-  video.src = URL.createObjectURL(file);
-  try {
-    await once(video, "loadedmetadata");
-    return video;
-  } catch (error) {
-    URL.revokeObjectURL(video.src);
-    throw error;
-  }
-}
-
-async function loadMediaMetadata(file: File): Promise<BrowserMetadata> {
-  if (file.type.startsWith("video/")) {
-    const video = await loadedVideoElement(file);
-    return {
-      duration: video.duration,
-      videoHeight: video.videoHeight,
-      videoWidth: video.videoWidth,
-    };
-  }
-  if (file.type.startsWith("audio/")) {
-    const audio = document.createElement("audio");
-    audio.preload = "metadata";
-    audio.src = URL.createObjectURL(file);
-    await once(audio, "loadedmetadata");
-    return { duration: audio.duration };
-  }
-  return { duration: 0 };
-}
-
-function encodeWav(audioBuffer: AudioBuffer): ArrayBuffer {
-  const channels = audioBuffer.numberOfChannels;
-  const length = audioBuffer.length * channels * 2;
-  const buffer = new ArrayBuffer(44 + length);
-  const view = new DataView(buffer);
-  writeAscii(view, 0, "RIFF");
-  view.setUint32(4, 36 + length, true);
-  writeAscii(view, 8, "WAVE");
-  writeAscii(view, 12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, channels, true);
-  view.setUint32(24, audioBuffer.sampleRate, true);
-  view.setUint32(28, audioBuffer.sampleRate * channels * 2, true);
-  view.setUint16(32, channels * 2, true);
-  view.setUint16(34, 16, true);
-  writeAscii(view, 36, "data");
-  view.setUint32(40, length, true);
-  let offset = 44;
-  for (let index = 0; index < audioBuffer.length; index += 1) {
-    for (let channel = 0; channel < channels; channel += 1) {
-      const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[index]));
-      view.setInt16(offset, sample < 0 ? sample * 32_768 : sample * 32_767, true);
-      offset += 2;
-    }
-  }
-  return buffer;
-}
-
-function writeAscii(view: DataView, offset: number, text: string) {
-  for (let index = 0; index < text.length; index += 1) {
-    view.setUint8(offset + index, text.codePointAt(index) ?? 0);
-  }
-}
-
-function canvasBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
-  return new Promise((resolvePromise, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob === null) {
-        reject(new Error("Canvas export failed"));
-      } else {
-        resolvePromise(blob);
-      }
-    }, type);
-  });
-}
-
-function once(target: EventTarget, eventName: string): Promise<Event> {
-  return new Promise((resolvePromise, reject) => {
-    target.addEventListener(eventName, resolvePromise, { once: true });
-    target.addEventListener(
-      "error",
-      () => {
-        reject(new Error(`${eventName} failed`));
-      },
-      {
-        once: true,
-      },
-    );
-  });
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolvePromise) => {
-    setTimeout(() => {
-      resolvePromise();
-    }, ms);
-  });
 }
 
 function savePickerOptions(output: RenderOutput | null = state.lastOutput): BrowserSaveOptions {
@@ -1295,8 +823,8 @@ function mimeForPreset(id: Operation) {
   if (id === "clip-mp4") {
     return "video/mp4";
   }
-  if (id === "video-webm") {
-    return "video/webm";
+  if (id === "video-mp4") {
+    return "video/mp4";
   }
   if (id === "poster-png") {
     return "image/png";
@@ -1346,30 +874,14 @@ function formatSeconds(value: number) {
   return String(Math.round(value * 1000) / 1000);
 }
 
-function videoCrf(quality: string) {
+function videoQuality(quality: string) {
   if (quality === "high") {
-    return "24";
+    return "2";
   }
   if (quality === "small") {
-    return "38";
+    return "9";
   }
-  return "31";
-}
-
-function videoBitrate(width: number, quality: string) {
-  let base = 800_000;
-  if (width >= 1280) {
-    base = 2_400_000;
-  } else if (width >= 854) {
-    base = 1_300_000;
-  }
-  if (quality === "high") {
-    return Math.round(base * 1.5);
-  }
-  if (quality === "small") {
-    return Math.round(base * 0.55);
-  }
-  return base;
+  return "5";
 }
 
 function formatBytes(bytes: number) {

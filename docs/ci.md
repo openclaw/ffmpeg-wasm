@@ -17,7 +17,7 @@ pnpm playground:e2e
 
 `pnpm test:e2e` rebuilds FFmpeg and FFprobe from source, then runs live verifier coverage against the generated wasm assets.
 
-`pnpm playground:e2e` launches Chrome through DevTools, loads the local playground, renders the sample MP4 clip, and writes `.tmp/playground-e2e.png`.
+`pnpm playground:e2e` launches Chrome through DevTools, loads the local playground, renders a smaller MP4 and MP3, and writes `.tmp/playground-e2e.png`.
 
 ## GitHub Actions
 

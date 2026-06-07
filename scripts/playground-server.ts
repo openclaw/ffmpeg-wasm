@@ -25,7 +25,14 @@ const port = parsePort(process.env.FFMPEG_WASM_PLAYGROUND_PORT ?? process.env.PO
 const maxUploadBytes = 2 * 1024 * 1024 * 1024;
 const requestToken = randomBytes(24).toString("base64url");
 
-const operations = ["clip-mp4", "poster-png", "audio-mp3", "audio-wav", "hash-raw"] as const;
+const operations = [
+  "clip-mp4",
+  "video-mp4",
+  "poster-png",
+  "audio-mp3",
+  "audio-wav",
+  "hash-raw",
+] as const;
 type Operation = (typeof operations)[number];
 
 interface OutputPlan {
@@ -139,6 +146,9 @@ function buildOutputPlan(
     case "clip-mp4": {
       return buildClipPlan(inputPath, jobDir, params);
     }
+    case "video-mp4": {
+      return buildVideoPlan(inputPath, jobDir, params);
+    }
     case "poster-png": {
       return buildPosterPlan(inputPath, jobDir, params);
     }
@@ -183,6 +193,40 @@ function buildClipPlan(inputPath: string, jobDir: string, params: URLSearchParam
       outputPath,
     ],
     fileName: "clip.mp4",
+    mimeType: "video/mp4",
+    outputPath,
+  };
+}
+
+function buildVideoPlan(inputPath: string, jobDir: string, params: URLSearchParams): OutputPlan {
+  const outputPath = join(jobDir, "smaller.mp4");
+  const start = numberParam(params, "start", 0, 0, 86_400);
+  const duration = numberParam(params, "duration", 5, 0.2, 86_400);
+  const width = integerParam(params, "width", 1280, 128, 3840);
+  const quality = choiceParam(params, "quality", ["small", "balanced", "high"], "balanced");
+  return {
+    args: [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-ss",
+      formatSeconds(start),
+      "-i",
+      inputPath,
+      "-t",
+      formatSeconds(duration),
+      "-vf",
+      `scale=${width}:-2,format=yuv420p`,
+      "-c:v",
+      "mpeg4",
+      "-q:v",
+      videoQuality(quality),
+      "-an",
+      "-movflags",
+      "+faststart",
+      outputPath,
+    ],
+    fileName: "smaller.mp4",
     mimeType: "video/mp4",
     outputPath,
   };
@@ -547,6 +591,16 @@ function choiceParam<const T extends string>(
 ): T {
   const value = params.get(name);
   return choices.find((choice) => choice === value) ?? fallback;
+}
+
+function videoQuality(quality: string) {
+  if (quality === "high") {
+    return "2";
+  }
+  if (quality === "small") {
+    return "9";
+  }
+  return "5";
 }
 
 function formatSeconds(value: number) {

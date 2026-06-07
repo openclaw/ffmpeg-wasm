@@ -73,8 +73,10 @@ Enabled decoders:
 
 - `aac`
 - `flac`
+- `h263`
 - `h264`
 - `hevc`
+- `mpeg4`
 - `mjpeg`
 - `mp3`
 - `opus`
@@ -86,7 +88,9 @@ Enabled decoders:
 
 Enabled encoders:
 
+- `h263`
 - `libmp3lame`
+- `mpeg4`
 - `pcm_s16le`
 - `png`
 - `rawvideo`
@@ -109,7 +113,7 @@ External libraries:
 - `libmp3lame`
 - `zlib`
 
-The verified `dist/` size is about 7-8 MB on current builds.
+The verified `dist/` size is about 8.1 MB on current builds.
 
 ## Install
 
@@ -148,7 +152,7 @@ pnpm check
 
 `pnpm playground` starts a local one-page media bench at `http://127.0.0.1:4173`. It lets you load a video, choose a supported preset, inspect the generated FFmpeg args, render through the wasm wrapper, preview the output inline, and save via the browser file picker or download fallback.
 
-`pnpm playground:e2e` starts the playground on a temporary port, launches Chrome through DevTools, loads the sample video, renders an MP4 clip, and writes `.tmp/playground-e2e.png` for visual proof.
+`pnpm playground:e2e` starts the playground on a temporary port, launches Chrome through DevTools, loads the sample video, renders a smaller MP4 and an MP3, and writes `.tmp/playground-e2e.png` for visual proof.
 
 `pnpm verify` creates a tiny native test video, then exercises FFprobe text and JSON output, WAV/MP3 extraction, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, segmentation, cwd/dist overrides, API validation failures, and CLI success/failure paths.
 

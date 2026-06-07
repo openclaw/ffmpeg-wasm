@@ -160,28 +160,37 @@ try {
         cdp,
         "document.querySelector('#parameterTitle')?.textContent === 'Poster frame' && document.querySelector('#frameInput')?.value === '2'",
       );
-      await clickSelector(cdp, "[data-testid=preset-video-webm]");
+      await clickSelector(cdp, "[data-testid=preset-video-mp4]");
       await waitFor(
         cdp,
-        "!document.querySelector('.video-quality-field')?.classList.contains('hidden') && document.querySelector('[data-testid=command-preview]')?.value.includes('scale=1280:-2')",
+        "!document.querySelector('.video-quality-field')?.classList.contains('hidden') && document.querySelector('[data-testid=command-preview]')?.value.includes('scale=1280:-2,format=yuv420p') && document.querySelector('[data-testid=command-preview]')?.value.includes('-c:v mpeg4')",
       );
-      await clickSelector(cdp, "[data-testid=preset-clip-mp4]");
       await cdp.send("Runtime.evaluate", { expression: "delete globalThis.__lastRender" });
       await clickSelector(cdp, "[data-testid=render-button]");
       await waitFor(cdp, "!!globalThis.__lastRender", 120_000);
-      const state = await readState(cdp);
-      if (state.lastRender.operation !== "clip-mp4" || state.lastRender.bytes <= 1000) {
-        throw new Error(`Unexpected render result: ${JSON.stringify(state.lastRender)}`);
+      const videoState = await readState(cdp);
+      if (videoState.lastRender.operation !== "video-mp4" || videoState.lastRender.bytes <= 1000) {
+        throw new Error(`Unexpected video render result: ${JSON.stringify(videoState.lastRender)}`);
       }
-      if (!state.outputVideo || state.status !== "Rendered") {
-        throw new Error(`Unexpected UI state: ${JSON.stringify(state)}`);
+      if (!videoState.outputVideo || videoState.status !== "Rendered") {
+        throw new Error(`Unexpected video UI state: ${JSON.stringify(videoState)}`);
+      }
+      await clickSelector(cdp, "[data-testid=preset-audio-mp3]");
+      await cdp.send("Runtime.evaluate", { expression: "delete globalThis.__lastRender" });
+      await clickSelector(cdp, "[data-testid=render-button]");
+      await waitFor(cdp, "globalThis.__lastRender?.operation === 'audio-mp3'", 120_000);
+      const audioState = await readState(cdp);
+      if (audioState.lastRender.bytes <= 1000 || !audioState.outputAudio) {
+        throw new Error(`Unexpected audio render result: ${JSON.stringify(audioState)}`);
       }
       const screenshot = await cdp.send("Page.captureScreenshot", {
         captureBeyondViewport: true,
         format: "png",
       });
       await writeFile(screenshotPath, Buffer.from(asStringField(screenshot, "data"), "base64"));
-      console.log(`playground e2e ok (${state.lastRender.name}, ${state.lastRender.bytes} bytes)`);
+      console.log(
+        `playground e2e ok (${videoState.lastRender.name}, ${audioState.lastRender.name})`,
+      );
       console.log(`screenshot: ${screenshotPath}`);
     } catch (error) {
       await writeFailureState(cdp);
@@ -300,6 +309,7 @@ async function readState(cdp: CdpClient) {
       status: document.querySelector('[data-testid=status-text]').textContent,
       outputTitle: document.querySelector('[data-testid=output-title]').textContent,
       outputMetrics: document.querySelector('[data-testid=output-metrics]').textContent,
+      outputAudio: !!document.querySelector('[data-testid=output-viewer] audio'),
       outputVideo: !!document.querySelector('[data-testid=output-viewer] video'),
       lastRender: globalThis.__lastRender
     })`,
@@ -311,6 +321,7 @@ async function readState(cdp: CdpClient) {
   const parsed = asRecord(parseJson(value));
   return {
     lastRender: asRenderState(parsed.lastRender),
+    outputAudio: parsed.outputAudio === true,
     outputTitle: asString(parsed.outputTitle),
     outputVideo: parsed.outputVideo === true,
     status: asString(parsed.status),
