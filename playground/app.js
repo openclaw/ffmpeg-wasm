@@ -37,6 +37,7 @@ const presets = [
 ];
 
 const state = {
+  commandEdited: false,
   file: null,
   inputUrl: null,
   lastOutput: null,
@@ -50,7 +51,7 @@ const playgroundToken =
 const elements = {
   bitrateSelect: document.querySelector("#bitrateSelect"),
   channelsSelect: document.querySelector("#channelsSelect"),
-  commandPreview: document.querySelector("#commandPreview"),
+  commandInput: document.querySelector("#commandInput"),
   copyButton: document.querySelector("#copyButton"),
   durationInput: document.querySelector("#durationInput"),
   fileInput: document.querySelector("#fileInput"),
@@ -59,6 +60,7 @@ const elements = {
   outputTitle: document.querySelector("#outputTitle"),
   outputViewer: document.querySelector("#outputViewer"),
   parameterTitle: document.querySelector("#parameterTitle"),
+  presetArgsButton: document.querySelector("#presetArgsButton"),
   presetList: document.querySelector("#presetList"),
   renderButton: document.querySelector("#renderButton"),
   renderSaveButton: document.querySelector("#renderSaveButton"),
@@ -99,8 +101,15 @@ function bindEvents() {
     void saveLastOutput();
   });
   elements.copyButton.addEventListener("click", () => {
-    void navigator.clipboard?.writeText(elements.commandPreview.textContent ?? "");
-    setStatus("Copied args", "idle");
+    void navigator.clipboard?.writeText(elements.commandInput.value);
+    setStatus("Copied command", "idle");
+  });
+  elements.commandInput.addEventListener("input", () => {
+    state.commandEdited = elements.commandInput.value !== displayCommand();
+  });
+  elements.presetArgsButton.addEventListener("click", () => {
+    state.commandEdited = false;
+    updateCommand();
   });
   for (const input of [
     elements.startInput,
@@ -123,6 +132,10 @@ function renderPresets() {
       button.className = `preset-card${preset.id === state.operation ? " active" : ""}`;
       button.dataset.operation = preset.id;
       button.dataset.tone = preset.tone;
+      button.disabled = preset.id === "audio-mp3" && !hasBackend();
+      if (button.disabled) {
+        button.title = "MP3 output requires the local wasm backend";
+      }
       button.type = "button";
       button.innerHTML = `
         <span class="preset-mark" aria-hidden="true"></span>
@@ -134,6 +147,7 @@ function renderPresets() {
       `;
       button.addEventListener("click", () => {
         state.operation = preset.id;
+        state.commandEdited = false;
         renderPresets();
         updateControls();
         updateCommand();
@@ -145,12 +159,24 @@ function renderPresets() {
 
 async function loadSample() {
   setStatus("Loading sample", "busy");
-  const response = await fetch("/api/sample", { headers: playgroundHeaders() });
-  if (!response.ok) {
-    await failFromResponse(response);
+  try {
+    if (!hasBackend()) {
+      throw new Error("Static workbench sample");
+    }
+    const response = await fetch("/api/sample", { headers: playgroundHeaders() });
+    if (!response.ok) {
+      await failFromResponse(response);
+    }
+    const blob = await response.blob();
+    await setSourceFile(new File([blob], "sample.mp4", { type: "video/mp4" }));
+  } catch {
+    try {
+      await setSourceFile(await browserSampleFile());
+      setStatus("Ready", "idle");
+    } catch (error) {
+      setStatus(error.message, "error");
+    }
   }
-  const blob = await response.blob();
-  await setSourceFile(new File([blob], "sample.mp4", { type: "video/mp4" }));
 }
 
 async function setSourceFile(file) {
@@ -178,19 +204,26 @@ async function setSourceFile(file) {
 }
 
 async function probeFile(file) {
-  const response = await fetch("/api/probe", {
-    body: file,
-    headers: {
-      "Content-Type": "application/octet-stream",
-      ...playgroundHeaders(),
-      "X-File-Name": safeHeaderName(file.name),
-    },
-    method: "POST",
-  });
-  if (!response.ok) {
-    await failFromResponse(response);
+  try {
+    if (!hasBackend()) {
+      throw new Error("Static workbench probe");
+    }
+    const response = await fetch("/api/probe", {
+      body: file,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        ...playgroundHeaders(),
+        "X-File-Name": safeHeaderName(file.name),
+      },
+      method: "POST",
+    });
+    if (!response.ok) {
+      await failFromResponse(response);
+    }
+    return response.json();
+  } catch {
+    return probeFileInBrowser(file);
   }
-  return response.json();
 }
 
 async function renderOutput(saveAfterRender) {
@@ -198,11 +231,15 @@ async function renderOutput(saveAfterRender) {
     setStatus("Load media first", "error");
     return;
   }
+  if (state.commandEdited) {
+    setStatus("Use preset args before rendering", "error");
+    return;
+  }
 
   let saveHandle = null;
-  if (saveAfterRender && "showSaveFilePicker" in window) {
+  if (saveAfterRender && playgroundToken && "showSaveFilePicker" in window) {
     try {
-      saveHandle = await window.showSaveFilePicker(savePickerOptions());
+      saveHandle = await window.showSaveFilePicker(savePickerOptions(null));
     } catch (error) {
       if (error.name === "AbortError") {
         setStatus("Save canceled", "idle");
@@ -216,31 +253,16 @@ async function renderOutput(saveAfterRender) {
   elements.renderButton.disabled = true;
   elements.renderSaveButton.disabled = true;
   try {
-    const query = buildQuery();
-    const response = await fetch(`/api/render?${query.toString()}`, {
-      body: state.file,
-      headers: {
-        "Content-Type": "application/octet-stream",
-        ...playgroundHeaders(),
-        "X-File-Name": safeHeaderName(state.file.name),
-      },
-      method: "POST",
-    });
-    if (!response.ok) {
-      await failFromResponse(response);
-    }
-    const blob = await response.blob();
-    const outputName = response.headers.get("X-Output-Name") ?? currentPreset().name;
-    const ffmpegArgs = response.headers.get("X-Ffmpeg-Args");
-    setLastOutput({ blob, ffmpegArgs, name: outputName });
+    const rendered = await renderWithBestBackend({ allowFallback: !saveHandle });
+    setLastOutput(rendered);
     if (saveHandle) {
-      await writeBlobToHandle(saveHandle, blob);
+      await writeBlobToHandle(saveHandle, rendered.blob);
       setStatus("Saved", "idle");
     } else if (saveAfterRender) {
-      downloadBlob(blob, outputName);
+      downloadBlob(rendered.blob, rendered.name);
       setStatus("Downloaded", "idle");
     } else {
-      setStatus("Rendered", "idle");
+      setStatus(rendered.browserFallback ? "Rendered in browser" : "Rendered", "idle");
     }
   } catch (error) {
     setStatus(error.message, "error");
@@ -259,7 +281,7 @@ function setLastOutput(output) {
   setOutputViewer(output.blob, url);
   const delta = state.file ? output.blob.size - state.file.size : 0;
   setMetrics(elements.outputMetrics, [
-    currentPreset().extension,
+    output.name.match(/\.[^.]+$/)?.[0] ?? currentPreset().extension,
     formatBytes(output.blob.size),
     formatDelta(delta),
   ]);
@@ -377,7 +399,64 @@ function updateControls() {
 }
 
 function updateCommand() {
-  elements.commandPreview.textContent = ["ffmpeg", ...buildDisplayArgs()].map(quoteShell).join(" ");
+  if (!state.commandEdited) {
+    elements.commandInput.value = displayCommand();
+  }
+}
+
+function displayCommand() {
+  return ["ffmpeg", ...buildDisplayArgs()].map(quoteShell).join(" ");
+}
+
+async function renderWithBestBackend(options = {}) {
+  try {
+    if (!hasBackend()) {
+      throw new Error("Static workbench render");
+    }
+    const query = buildQuery();
+    const response = await fetch(`/api/render?${query.toString()}`, {
+      body: state.file,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        ...playgroundHeaders(),
+        "X-File-Name": safeHeaderName(state.file.name),
+      },
+      method: "POST",
+    });
+    if (!response.ok) {
+      await failFromResponse(response);
+    }
+    return {
+      blob: await response.blob(),
+      ffmpegArgs: response.headers.get("X-Ffmpeg-Args"),
+      name: response.headers.get("X-Output-Name") ?? defaultOutputName(),
+    };
+  } catch (error) {
+    if (options.allowFallback === false) {
+      throw error;
+    }
+    const fallback = await renderInBrowser();
+    return {
+      ...fallback,
+      browserFallback: true,
+      ffmpegArgs: JSON.stringify(buildDisplayArgs()),
+    };
+  }
+}
+
+async function renderInBrowser() {
+  switch (state.operation) {
+    case "clip-mp4":
+      return renderClipInBrowser();
+    case "poster-png":
+      return renderPosterInBrowser();
+    case "audio-mp3":
+      throw new Error("MP3 output requires the local wasm backend");
+    case "audio-wav":
+      return renderWavInBrowser();
+    case "hash-raw":
+      return renderRawFrameInBrowser();
+  }
 }
 
 function buildQuery() {
@@ -476,16 +555,305 @@ function buildDisplayArgs() {
   }
 }
 
-function savePickerOptions() {
+async function browserSampleFile() {
+  if (!("MediaRecorder" in window)) {
+    throw new Error("Sample generation is unavailable in this browser");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = 960;
+  canvas.height = 540;
+  const context = canvas.getContext("2d");
+  const stream = canvas.captureStream(24);
+  const audioContext = new AudioContext();
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const audioStream = audioContext.createMediaStreamDestination();
+  oscillator.frequency.value = 440;
+  gain.gain.value = 0.05;
+  oscillator.connect(gain);
+  gain.connect(audioStream);
+  oscillator.start();
+  for (const track of audioStream.stream.getAudioTracks()) {
+    stream.addTrack(track);
+  }
+  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+    ? "video/webm;codecs=vp9"
+    : "video/webm";
+  const recorder = new MediaRecorder(stream, { mimeType: mime });
+  const chunks = [];
+  let started = 0;
+  let animation = 0;
+  const paint = (time) => {
+    if (!started) started = time;
+    const elapsed = (time - started) / 1000;
+    context.fillStyle = "#080a08";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#b8e48c";
+    context.fillRect(80 + Math.sin(elapsed * 2) * 40, 120, 280, 160);
+    context.fillStyle = "#9cc7ff";
+    context.fillRect(420, 170 + Math.cos(elapsed * 2.4) * 60, 360, 190);
+    context.fillStyle = "#f4f1e8";
+    context.font = "700 44px sans-serif";
+    context.fillText("ffmpeg.sh sample", 80, 430);
+    animation = requestAnimationFrame(paint);
+  };
+  animation = requestAnimationFrame(paint);
+  return new Promise((resolvePromise, reject) => {
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    });
+    recorder.addEventListener("error", () => {
+      cancelAnimationFrame(animation);
+      oscillator.stop();
+      void audioContext.close();
+      reject(new Error("Sample recording failed"));
+    });
+    recorder.addEventListener("stop", () => {
+      cancelAnimationFrame(animation);
+      oscillator.stop();
+      void audioContext.close();
+      resolvePromise(new File(chunks, "sample.webm", { type: "video/webm" }));
+    });
+    recorder.start();
+    setTimeout(() => recorder.stop(), 6200);
+  });
+}
+
+async function probeFileInBrowser(file) {
+  const meta = await loadMediaMetadata(file);
+  return {
+    format: {
+      duration: String(meta.duration || 0),
+    },
+    streams: [
+      ...(meta.videoWidth
+        ? [
+            {
+              codec_name: file.type.includes("webm") ? "webm" : "video",
+              codec_type: "video",
+              height: meta.videoHeight,
+              width: meta.videoWidth,
+            },
+          ]
+        : []),
+      ...(file.type.startsWith("audio/")
+        ? [
+            {
+              codec_name: "audio",
+              codec_type: "audio",
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+async function renderPosterInBrowser() {
+  const frame = await videoFrameCanvas(
+    Number(elements.frameInput.value),
+    Number(elements.widthSelect.value),
+  );
+  const blob = await canvasBlob(frame.canvas, "image/png");
+  return { blob, name: `${baseName(state.file.name)}-poster.png` };
+}
+
+async function renderRawFrameInBrowser() {
+  const frame = await videoFrameCanvas(Number(elements.frameInput.value), 32, 32);
+  const pixels = frame.context.getImageData(0, 0, 32, 32).data;
+  const gray = new Uint8Array(32 * 32);
+  for (let index = 0; index < gray.length; index += 1) {
+    const pixel = index * 4;
+    gray[index] = Math.round(
+      pixels[pixel] * 0.299 + pixels[pixel + 1] * 0.587 + pixels[pixel + 2] * 0.114,
+    );
+  }
+  return {
+    blob: new Blob([gray], { type: "application/octet-stream" }),
+    name: `${baseName(state.file.name)}-frame-gray.raw`,
+  };
+}
+
+async function renderClipInBrowser() {
+  if (!("MediaRecorder" in window)) {
+    throw new Error("Browser clip rendering is unavailable");
+  }
+  const video = await loadedVideoElement(state.file);
+  const start = Number(elements.startInput.value);
+  const duration = Number(elements.durationInput.value);
+  await seekVideo(video, Math.min(start, Math.max(0, video.duration - 0.1)));
+  video.muted = true;
+  video.playbackRate = 1;
+  const stream = video.captureStream();
+  const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+  const chunks = [];
+  recorder.addEventListener("dataavailable", (event) => {
+    if (event.data.size > 0) chunks.push(event.data);
+  });
+  const stopped = once(recorder, "stop");
+  recorder.start();
+  await video.play();
+  await wait(Math.max(200, duration * 1000));
+  recorder.stop();
+  video.pause();
+  await stopped;
+  return {
+    blob: new Blob(chunks, { type: "video/webm" }),
+    name: `${baseName(state.file.name)}-clip.webm`,
+  };
+}
+
+async function renderWavInBrowser() {
+  const arrayBuffer = await state.file.arrayBuffer();
+  const audioContext = new AudioContext();
+  try {
+    const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+    const channels = Number(elements.channelsSelect.value);
+    const sampleRate = Number(elements.sampleRateSelect.value);
+    const length = Math.ceil(decoded.duration * sampleRate);
+    const offline = new OfflineAudioContext(channels, length, sampleRate);
+    const source = offline.createBufferSource();
+    source.buffer = decoded;
+    source.connect(offline.destination);
+    source.start();
+    const rendered = await offline.startRendering();
+    return {
+      blob: new Blob([encodeWav(rendered)], { type: "audio/wav" }),
+      name: `${baseName(state.file.name)}-audio.wav`,
+    };
+  } finally {
+    await audioContext.close();
+  }
+}
+
+async function videoFrameCanvas(seconds, width, height) {
+  const video = await loadedVideoElement(state.file);
+  await seekVideo(video, Math.min(Math.max(0, seconds), Math.max(0, video.duration - 0.1)));
+  const ratio = video.videoHeight / video.videoWidth || 9 / 16;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height ?? Math.max(2, Math.round(width * ratio));
+  const context = canvas.getContext("2d");
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return { canvas, context };
+}
+
+async function seekVideo(video, targetTime) {
+  if (Math.abs(video.currentTime - targetTime) < 0.01) {
+    return;
+  }
+  const seeked = once(video, "seeked");
+  video.currentTime = targetTime;
+  await seeked;
+}
+
+async function loadedVideoElement(file) {
+  const video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+  video.src = URL.createObjectURL(file);
+  try {
+    await once(video, "loadedmetadata");
+    return video;
+  } catch (error) {
+    URL.revokeObjectURL(video.src);
+    throw error;
+  }
+}
+
+async function loadMediaMetadata(file) {
+  if (file.type.startsWith("video/")) {
+    const video = await loadedVideoElement(file);
+    return {
+      duration: video.duration,
+      videoHeight: video.videoHeight,
+      videoWidth: video.videoWidth,
+    };
+  }
+  if (file.type.startsWith("audio/")) {
+    const audio = document.createElement("audio");
+    audio.preload = "metadata";
+    audio.src = URL.createObjectURL(file);
+    await once(audio, "loadedmetadata");
+    return { duration: audio.duration };
+  }
+  return { duration: 0 };
+}
+
+function encodeWav(audioBuffer) {
+  const channels = audioBuffer.numberOfChannels;
+  const length = audioBuffer.length * channels * 2;
+  const buffer = new ArrayBuffer(44 + length);
+  const view = new DataView(buffer);
+  writeAscii(view, 0, "RIFF");
+  view.setUint32(4, 36 + length, true);
+  writeAscii(view, 8, "WAVE");
+  writeAscii(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, audioBuffer.sampleRate, true);
+  view.setUint32(28, audioBuffer.sampleRate * channels * 2, true);
+  view.setUint16(32, channels * 2, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, "data");
+  view.setUint32(40, length, true);
+  let offset = 44;
+  for (let index = 0; index < audioBuffer.length; index += 1) {
+    for (let channel = 0; channel < channels; channel += 1) {
+      const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[index]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += 2;
+    }
+  }
+  return buffer;
+}
+
+function writeAscii(view, offset, text) {
+  for (let index = 0; index < text.length; index += 1) {
+    view.setUint8(offset + index, text.charCodeAt(index));
+  }
+}
+
+function canvasBlob(canvas, type) {
+  return new Promise((resolvePromise, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolvePromise(blob);
+      } else {
+        reject(new Error("Canvas export failed"));
+      }
+    }, type);
+  });
+}
+
+function once(target, eventName) {
+  return new Promise((resolvePromise, reject) => {
+    target.addEventListener(eventName, resolvePromise, { once: true });
+    target.addEventListener("error", () => reject(new Error(`${eventName} failed`)), {
+      once: true,
+    });
+  });
+}
+
+function wait(ms) {
+  return new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
+}
+
+function savePickerOptions(output = state.lastOutput) {
   const preset = currentPreset();
-  const mime = mimeForPreset(preset.id);
+  const extension = output?.name.match(/\.[^.]+$/)?.[0] ?? preset.extension;
+  const mime = output?.blob.type || mimeForPreset(preset.id);
   return {
     id: "ffmpeg-wasm-output",
     startIn: "videos",
-    suggestedName: state.lastOutput?.name ?? defaultOutputName(),
+    suggestedName: output?.name ?? defaultOutputName(),
     types: [
       {
-        accept: { [mime]: [preset.extension] },
+        accept: { [mime]: [extension] },
         description: preset.name,
       },
     ],
@@ -566,6 +934,10 @@ function safeHeaderName(name) {
 
 function playgroundHeaders() {
   return { "X-Playground-Token": playgroundToken };
+}
+
+function hasBackend() {
+  return playgroundToken.length > 0;
 }
 
 function formatBytes(bytes) {

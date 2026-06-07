@@ -1,6 +1,6 @@
 ---
 title: ffmpeg.sh
-permalink: /
+permalink: /docs/
 description: "Lightweight FFmpeg and FFprobe WebAssembly for local media automation."
 ---
 

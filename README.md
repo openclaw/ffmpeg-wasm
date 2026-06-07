@@ -144,7 +144,7 @@ pnpm check
 
 `pnpm build` compiles TypeScript, fetches the configured FFmpeg/LAME refs into `.cache/`, builds static LAME, builds FFmpeg/FFprobe wasm, and writes generated assets to `dist/`.
 
-`pnpm docs:build` builds the GitHub Pages site from `docs/*.md` into `dist/docs-site`.
+`pnpm docs:build` builds the static site into `dist/docs-site`: the media workbench at `/` and documentation under `/docs/`.
 
 `pnpm playground` starts a local one-page media bench at `http://127.0.0.1:4173`. It lets you load a video, choose a supported preset, inspect the generated FFmpeg args, render through the wasm wrapper, preview the output inline, and save via the browser file picker or download fallback.
 

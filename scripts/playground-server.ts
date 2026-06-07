@@ -54,6 +54,11 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
     sendIndex(response);
     return;
   }
+  if (request.method === "GET" && (url.pathname === "/docs" || url.pathname === "/docs/")) {
+    response.writeHead(302, { Location: "https://ffmpeg.sh/docs/" });
+    response.end();
+    return;
+  }
   if (request.method === "GET" && url.pathname === "/app.js") {
     await sendStatic(response, "app.js", "text/javascript; charset=utf-8");
     return;

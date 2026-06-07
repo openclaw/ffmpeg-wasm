@@ -14,6 +14,7 @@ import { basename, dirname, relative, resolve, sep } from "node:path";
 const root = resolve(import.meta.dirname, "..", "..");
 const docsDir = resolve(root, "docs");
 const outDir = resolve(root, "dist", "docs-site");
+const playgroundDir = resolve(root, "playground");
 const repoBase = "https://github.com/openclaw/ffmpeg-wasm";
 const productName = "ffmpeg.sh";
 const tagline = "Lightweight FFmpeg WebAssembly for local media automation";
@@ -33,7 +34,7 @@ interface Page {
 }
 
 const nav = [
-  ["Start", ["index.md", "docs.md", "install.md", "build-surface.md"]],
+  ["Start", ["index.md", "install.md", "build-surface.md"]],
   ["Use", ["api.md", "cli.md", "playground.md", "recipes.md"]],
   ["Project", ["licensing.md", "ci.md", "domains.md"]],
 ] as const;
@@ -50,6 +51,7 @@ for (const page of pages) {
   writeFileSync(outputPath, layout(page, html), "utf8");
 }
 
+copyWorkbench();
 copyAssets();
 const cnamePath = resolve(docsDir, "CNAME");
 if (existsSync(cnamePath)) {
@@ -281,7 +283,6 @@ function relativeLink(fromDir: string, toRel: string, hash: string) {
 }
 
 function layout(page: Page, html: string) {
-  const isHome = page.outRel === "index.html";
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -291,7 +292,7 @@ function layout(page: Page, html: string) {
     <title>${escapeHtml(page.title)} · ${productName}</title>
     <style>${css()}</style>
   </head>
-  <body class="${isHome ? "home" : "docs"}">
+  <body class="docs">
     <aside>
       <a class="brand" href="${relativeLink(dirname(page.outRel), "index.html", "")}">
         <span>${productName}</span>
@@ -337,6 +338,17 @@ function copyAssets() {
       copyFileSync(source, resolve(outputAssets, entry));
     }
   }
+}
+
+function copyWorkbench() {
+  const index = readFileSync(resolve(playgroundDir, "index.html"), "utf8")
+    .replace("__PLAYGROUND_TOKEN__", "")
+    .replace('href="/styles.css"', 'href="styles.css"')
+    .replace('href="/docs/"', 'href="docs/"')
+    .replace('src="/app.js"', 'src="app.js"');
+  writeFileSync(resolve(outDir, "index.html"), index, "utf8");
+  copyFileSync(resolve(playgroundDir, "app.js"), resolve(outDir, "app.js"));
+  copyFileSync(resolve(playgroundDir, "styles.css"), resolve(outDir, "styles.css"));
 }
 
 function llmsText() {

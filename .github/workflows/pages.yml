@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "docs/**"
+      - "playground/**"
       - "scripts/build-docs-site.ts"
       - "package.json"
       - "pnpm-lock.yaml"

@@ -4,19 +4,38 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="playground-token" content="__PLAYGROUND_TOKEN__" />
-    <title>ffmpeg-wasm bench</title>
+    <title>ffmpeg.sh Workbench</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="workspace">
       <header class="topbar">
         <div>
-          <p class="eyebrow">ffmpeg-wasm local</p>
-          <h1>Media Bench</h1>
+          <p class="eyebrow">ffmpeg.sh workbench</p>
+          <h1>Media Workbench</h1>
         </div>
-        <div class="status-pill" data-testid="status-pill">
-          <span class="status-dot"></span>
-          <span id="statusText" data-testid="status-text">Idle</span>
+        <div class="top-actions">
+          <button
+            id="sampleButton"
+            class="icon-button"
+            type="button"
+            data-testid="sample-button"
+            title="Load sample media"
+          >
+            Sample
+          </button>
+          <a class="icon-button" href="/docs/" title="Open documentation">Docs</a>
+          <a
+            class="icon-button"
+            href="https://github.com/openclaw/ffmpeg-wasm"
+            title="Open GitHub repository"
+          >
+            GitHub
+          </a>
+          <div class="status-pill" data-testid="status-pill">
+            <span class="status-dot"></span>
+            <span id="statusText" data-testid="status-text">Idle</span>
+          </div>
         </div>
       </header>
 
@@ -37,14 +56,6 @@
                 />
                 <span aria-hidden="true">Open</span>
               </label>
-              <button
-                id="sampleButton"
-                class="icon-button"
-                type="button"
-                data-testid="sample-button"
-              >
-                Sample
-              </button>
             </div>
           </div>
           <div id="sourceViewer" class="media-frame empty">
@@ -176,10 +187,18 @@
 
           <div class="command-block">
             <div class="command-head">
-              <span>FFmpeg args</span>
-              <button id="copyButton" class="text-button" type="button">Copy</button>
+              <span>Command</span>
+              <div class="button-row">
+                <button id="presetArgsButton" class="text-button" type="button">Preset args</button>
+                <button id="copyButton" class="text-button" type="button">Copy</button>
+              </div>
             </div>
-            <pre id="commandPreview" data-testid="command-preview"></pre>
+            <textarea
+              id="commandInput"
+              autocomplete="off"
+              spellcheck="false"
+              data-testid="command-preview"
+            ></textarea>
           </div>
 
           <div class="action-row">

@@ -32,7 +32,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -49,8 +50,17 @@ button {
 .topbar {
   display: flex;
   align-items: flex-end;
+  gap: 18px;
   justify-content: space-between;
   margin-bottom: 18px;
+}
+
+.top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .eyebrow {
@@ -86,6 +96,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--ink);
+  text-decoration: none;
   background: #151714;
 }
 
@@ -186,6 +197,11 @@ h2 {
 .icon-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.preset-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.44;
 }
 
 .file-pick input {
@@ -401,17 +417,22 @@ dd {
   text-transform: uppercase;
 }
 
-pre {
+textarea {
+  display: block;
+  width: 100%;
   min-height: 88px;
   max-height: 154px;
   margin: 0;
   padding: 12px;
   overflow: auto;
+  resize: vertical;
+  border: 0;
+  outline: 0;
   color: #d8e9c7;
+  background: #0c0d0c;
   font-family: "SF Mono", "Cascadia Mono", monospace;
   font-size: 12px;
   line-height: 1.55;
-  white-space: pre-wrap;
 }
 
 .action-row {
@@ -466,5 +487,14 @@ pre {
 
   h1 {
     font-size: 36px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .top-actions {
+    justify-content: flex-start;
   }
 }
