@@ -10,15 +10,18 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const docsDir = resolve(root, "docs");
 const compiledPlaygroundDir = resolve(root, "lib", "playground");
 const outDir = resolve(root, "dist", "docs-site");
 const playgroundDir = resolve(root, "playground");
+const browserDist = resolve(root, "dist", "browser");
 const repoBase = "https://github.com/openclaw/ffmpeg-wasm";
 const productName = "ffmpeg.sh";
 const tagline = "Lightweight FFmpeg WebAssembly for local media automation";
+const allowMissingBrowserBundle = process.argv.includes("--allow-missing-browser");
 
 interface Frontmatter {
   description?: string;
@@ -53,12 +56,16 @@ for (const page of pages) {
 }
 
 copyWorkbench();
+writeRedirectFallback();
+copyBrowserWasm();
+writeSampleVideo();
 copyAssets();
 const cnamePath = resolve(docsDir, "CNAME");
 if (existsSync(cnamePath)) {
   writeFileSync(resolve(outDir, "CNAME"), `${readFileSync(cnamePath, "utf8").trim()}\n`);
 }
 writeFileSync(resolve(outDir, ".nojekyll"), "");
+writeFileSync(resolve(outDir, "_headers"), headersText(), "utf8");
 writeFileSync(resolve(outDir, "llms.txt"), llmsText(), "utf8");
 console.log(`built docs site: ${relative(root, outDir)}`);
 
@@ -292,6 +299,7 @@ function layout(page: Page, html: string) {
     <meta name="description" content="${escapeAttribute(page.description)}" />
     <title>${escapeHtml(page.title)} · ${productName}</title>
     <style>${css()}</style>
+    ${canonicalRedirectScript()}
   </head>
   <body class="docs">
     <aside>
@@ -344,13 +352,149 @@ function copyAssets() {
 function copyWorkbench() {
   const index = readFileSync(resolve(playgroundDir, "index.html"), "utf8")
     .replace("__PLAYGROUND_TOKEN__", "")
+    .replace("</head>", `${canonicalRedirectScript()}\n  </head>`)
     .replace('href="/styles.css"', 'href="styles.css"')
     .replace('href="/docs/"', 'href="docs/"')
     .replace('src="/app.js"', 'src="app.js"');
   writeFileSync(resolve(outDir, "index.html"), index, "utf8");
   copyFileSync(resolve(compiledPlaygroundDir, "app.js"), resolve(outDir, "app.js"));
   copyFileSync(resolve(compiledPlaygroundDir, "app.js.map"), resolve(outDir, "app.js.map"));
+  copyFileSync(
+    resolve(compiledPlaygroundDir, "ffmpac-worker.js"),
+    resolve(outDir, "ffmpac-worker.js"),
+  );
+  copyFileSync(
+    resolve(compiledPlaygroundDir, "ffmpac-worker.js.map"),
+    resolve(outDir, "ffmpac-worker.js.map"),
+  );
   copyFileSync(resolve(playgroundDir, "styles.css"), resolve(outDir, "styles.css"));
+}
+
+function canonicalRedirectScript() {
+  return `<script>
+(() => {
+  const { hostname, pathname, search, hash } = window.location;
+  if (hostname === "www.ffmpeg.sh") {
+    window.location.replace(\`https://ffmpeg.sh\${pathname}\${search}\${hash}\`);
+    return;
+  }
+  if (hostname === "docs.ffmpeg.sh") {
+    const docsPath = pathname === "/" || pathname === "/docs" ? "/docs/" : pathname.startsWith("/docs/") ? pathname : \`/docs\${pathname}\`;
+    window.location.replace(\`https://ffmpeg.sh\${docsPath}\${search}\${hash}\`);
+  }
+})();
+</script>`;
+}
+
+function writeRedirectFallback() {
+  writeFileSync(
+    resolve(outDir, "404.html"),
+    `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Redirecting · ${productName}</title>
+    ${canonicalRedirectScript()}
+  </head>
+  <body>
+    <p>Not found.</p>
+  </body>
+</html>
+`,
+    "utf8",
+  );
+}
+
+function copyBrowserWasm() {
+  if (!existsSync(browserDist)) {
+    if (allowMissingBrowserBundle) {
+      return;
+    }
+    throw new Error("Missing dist/browser. Run pnpm build before building deployable docs.");
+  }
+  for (const required of ["ffmpeg.js", "ffmpeg_g.wasm", "ffprobe.js", "ffprobe_g.wasm"]) {
+    if (!existsSync(resolve(browserDist, required))) {
+      throw new Error(`Missing dist/browser/${required}. Run pnpm build before building docs.`);
+    }
+  }
+  const outputWasm = resolve(outDir, "wasm");
+  mkdirSync(outputWasm, { recursive: true });
+  for (const name of [
+    "ffmpeg.js",
+    "ffmpeg.worker.js",
+    "ffmpeg_g",
+    "ffmpeg_g.wasm",
+    "ffprobe.js",
+    "ffprobe.worker.js",
+    "ffprobe_g",
+    "ffprobe_g.wasm",
+  ]) {
+    const source = resolve(browserDist, name);
+    if (existsSync(source)) {
+      copyFileSync(source, resolve(outputWasm, name));
+    }
+  }
+  copyGeneratedLicenses(outputWasm);
+}
+
+function copyGeneratedLicenses(outputDir: string) {
+  for (const name of [
+    "LICENSE.md",
+    "COPYING.LGPLv2.1",
+    "COPYING.LGPLv3",
+    "COPYING.GPLv2",
+    "COPYING.GPLv3",
+  ]) {
+    const source = resolve(distRoot(), name);
+    if (!existsSync(source)) {
+      throw new Error(`Missing dist/${name}. Run pnpm build before building docs.`);
+    }
+    copyFileSync(source, resolve(outputDir, name));
+  }
+}
+
+function distRoot() {
+  return resolve(root, "dist");
+}
+
+function writeSampleVideo() {
+  const samplePath = resolve(outDir, "sample.mp4");
+  const result = spawnSync(
+    "ffmpeg",
+    [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=960x540:rate=24:duration=8",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=8",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      samplePath,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    if (allowMissingBrowserBundle) {
+      console.warn("sample video skipped: native ffmpeg unavailable");
+      return;
+    }
+    throw new Error("Failed to generate deployable sample.mp4 with native ffmpeg.");
+  }
+  if (!existsSync(samplePath)) {
+    throw new Error("Failed to generate deployable sample.mp4.");
+  }
 }
 
 function llmsText() {
@@ -368,6 +512,27 @@ function llmsText() {
     `Source: ${repoBase}`,
   ];
   return `${lines.join("\n")}\n`;
+}
+
+function headersText() {
+  return `/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+  X-Content-Type-Options: nosniff
+
+/wasm/*.wasm
+  Content-Type: application/wasm
+
+/wasm/*.js
+  Content-Type: text/javascript; charset=utf-8
+
+/wasm/ffmpeg_g
+  Content-Type: text/javascript; charset=utf-8
+
+/wasm/ffprobe_g
+  Content-Type: text/javascript; charset=utf-8
+`;
 }
 
 function firstHeading(markdown: string) {

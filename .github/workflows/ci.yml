@@ -75,9 +75,9 @@ jobs:
             yasm
 
       - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:
-          version: latest
+          version: 4.0.23
           actions-cache-folder: emsdk-cache
 
       - name: Restore build cache
@@ -85,6 +85,7 @@ jobs:
         with:
           path: |
             .cache/FFmpeg
+            .cache/FFmpeg-browser
             .cache/lame
             .cache/emcache
           key: wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
@@ -100,6 +101,12 @@ jobs:
 
       - name: Playground E2E
         run: pnpm playground:e2e
+
+      - name: Build static workbench
+        run: pnpm docs:build:compiled
+
+      - name: Static browser ffmpac E2E
+        run: PLAYGROUND_E2E_STATIC=1 pnpm playground:e2e
 
       - name: Upload dist
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

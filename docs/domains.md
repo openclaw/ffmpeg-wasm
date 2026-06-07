@@ -1,28 +1,26 @@
 ---
 title: Domains
-description: "GitHub Pages domain layout for ffmpeg.sh and docs.ffmpeg.sh."
+description: "Cloudflare domain layout for ffmpeg.sh and docs.ffmpeg.sh."
 ---
 
 # Domains
 
 Cloudflare serves the canonical site at `https://ffmpeg.sh/` with the
-`ffmpeg-sh-site` Worker.
+`ffmpeg-sh-site` Pages project. The static artifact includes `_headers` so the
+workbench can use `SharedArrayBuffer` for the browser ffmpac pthread build.
 
-GitHub Pages stays on the repository URL, `https://openclaw.github.io/ffmpeg-wasm/`,
-and the Pages artifact does not ship a `CNAME`. Keeping GitHub Pages out of the
-custom-domain path avoids GitHub's apex/www canonical redirects while DNS changes
-are propagating.
+GitHub Pages is not used for the custom-domain path because it cannot serve the
+COOP/COEP headers required by the in-browser ffmpac runtime.
 
 DNS is hosted in Cloudflare:
 
-| Host             | Type    | Target                                                                                     | Proxy   |
-| ---------------- | ------- | ------------------------------------------------------------------------------------------ | ------- |
-| `ffmpeg.sh`      | `A`     | `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`                 | Proxied |
-| `ffmpeg.sh`      | `AAAA`  | `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153` | Proxied |
-| `www.ffmpeg.sh`  | `CNAME` | `openclaw.github.io`                                                                       | Proxied |
-| `docs.ffmpeg.sh` | `A`     | `192.0.2.1`                                                                                | Proxied |
+- `ffmpeg.sh`: Pages custom domain; serves the workbench at `/`.
+- `www.ffmpeg.sh`: Pages custom domain; redirects to `https://ffmpeg.sh/`.
+- `docs.ffmpeg.sh`: Pages custom domain; redirects into `https://ffmpeg.sh/docs/`.
 
-Cloudflare redirects `docs.ffmpeg.sh/docs/*` to `https://ffmpeg.sh/docs/$1`, then
-redirects `docs.ffmpeg.sh/*` to `https://ffmpeg.sh/docs/$1`.
+The static entrypoint performs the `www` and `docs` host redirects immediately.
+Prefer Cloudflare Redirect Rules for those hosts when a zone DNS/rules token is
+available; the Pages project custom domains keep TLS and hostname coverage in
+place either way.
 
-The Worker route handles both `ffmpeg.sh/*` and `www.ffmpeg.sh/*`.
+The Pages project handles `ffmpeg.sh/*`; host redirects handle `www` and `docs`.

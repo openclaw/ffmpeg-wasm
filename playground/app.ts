@@ -70,6 +70,31 @@ interface BrowserSaveOptions {
   }[];
 }
 
+interface BrowserToolResult {
+  exitCode: number;
+  outputFile?: ArrayBuffer;
+  stderrText: string;
+  stdoutText: string;
+}
+
+interface BrowserWorkerSuccess {
+  exitCode: number;
+  id: number;
+  ok: true;
+  outputFile?: ArrayBuffer;
+  stderrText: string;
+  stdoutText: string;
+}
+
+interface BrowserWorkerFailure {
+  error: string;
+  id: number;
+  ok: false;
+  stderrText?: string;
+}
+
+type BrowserWorkerResponse = BrowserWorkerFailure | BrowserWorkerSuccess;
+
 type BrowserGlobal = typeof globalThis & {
   __lastRender?: LastRenderState;
   showSaveFilePicker?: (options: BrowserSaveOptions) => Promise<BrowserFileHandle>;
@@ -264,16 +289,10 @@ function bindEvents() {
 }
 
 function configureBackendAvailability() {
-  if (hasBackend()) {
+  if (hasServerBackend()) {
     return;
   }
-  elements.sampleButton.disabled = true;
-  elements.fileInput.disabled = true;
-  elements.renderButton.disabled = true;
-  elements.renderSaveButton.disabled = true;
-  elements.sourceViewer.className = "media-frame empty";
-  elements.sourceViewer.replaceChildren(textNode("ffmpac backend required"));
-  setStatus("ffmpac backend unavailable", "error");
+  setStatus("Browser ffmpac", "idle");
 }
 
 function renderPresets() {
@@ -307,11 +326,9 @@ function renderPresets() {
 
 async function loadSample() {
   setStatus("Loading sample", "busy");
-  if (!hasBackend()) {
-    setStatus("ffmpac backend unavailable", "error");
-    return;
-  }
-  const response = await fetch("/api/sample", { headers: playgroundHeaders() });
+  const response = await fetch(hasServerBackend() ? "/api/sample" : "sample.mp4", {
+    headers: hasServerBackend() ? playgroundHeaders() : {},
+  });
   if (!response.ok) {
     await failFromResponse(response);
   }
@@ -346,8 +363,8 @@ async function setSourceFile(file: File) {
 }
 
 async function probeFile(file: File): Promise<ProbeResult> {
-  if (!hasBackend()) {
-    throw new Error("ffmpac backend unavailable");
+  if (!hasServerBackend()) {
+    return probeFileInBrowser(file);
   }
   const response = await fetch("/api/probe", {
     body: file,
@@ -379,7 +396,7 @@ async function renderOutput(saveAfterRender: boolean) {
   }
 
   let saveHandle: BrowserFileHandle | null = null;
-  if (saveAfterRender && playgroundToken.length > 0 && browserGlobal.showSaveFilePicker) {
+  if (saveAfterRender && browserGlobal.showSaveFilePicker) {
     const showSaveFilePicker = browserGlobal.showSaveFilePicker;
     try {
       saveHandle = await showSaveFilePicker(savePickerOptions(null));
@@ -596,8 +613,8 @@ function displayCommand() {
 
 async function renderWithBackend(): Promise<RenderOutput> {
   const file = sourceFile();
-  if (!hasBackend()) {
-    throw new Error("ffmpac backend unavailable");
+  if (!hasServerBackend()) {
+    return renderWithBrowserFfmpac(file);
   }
   const query = buildQuery();
   const response = await fetch(`/api/render?${query.toString()}`, {
@@ -617,6 +634,99 @@ async function renderWithBackend(): Promise<RenderOutput> {
     ffmpegArgs: response.headers.get("X-Ffmpeg-Args"),
     name: response.headers.get("X-Output-Name") ?? defaultOutputName(),
   };
+}
+
+async function probeFileInBrowser(file: File): Promise<ProbeResult> {
+  const inputPath = `/input${inputExtension(file.name)}`;
+  const result = await runBrowserTool("ffprobe", {
+    args: ["-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", inputPath],
+    inputPath,
+    source: file,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderrText || "ffprobe failed");
+  }
+  const parsed: unknown = JSON.parse(result.stdoutText);
+  if (!isProbeResult(parsed)) {
+    throw new Error("Invalid probe response");
+  }
+  return parsed;
+}
+
+async function renderWithBrowserFfmpac(file: File): Promise<RenderOutput> {
+  const operation = state.operation;
+  const inputPath = `/input${inputExtension(file.name)}`;
+  const outputName = backendOutputName();
+  const outputPath = `/${outputName}`;
+  const args = buildBackendArgs(inputPath, outputPath);
+  const result = await runBrowserTool("ffmpeg", { args, inputPath, outputPath, source: file });
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderrText || "ffmpeg failed");
+  }
+  if (result.outputFile === undefined) {
+    throw new Error("ffmpeg did not produce an output file");
+  }
+  return {
+    blob: new Blob([result.outputFile], { type: mimeForPreset(operation) }),
+    ffmpegArgs: JSON.stringify(args),
+    name: outputName,
+  };
+}
+
+async function runBrowserTool(
+  tool: "ffmpeg" | "ffprobe",
+  options: { args: string[]; inputPath: string; outputPath?: string; source: File },
+): Promise<BrowserToolResult> {
+  const inputBuffer = await options.source.arrayBuffer();
+  const worker = new Worker(new URL("ffmpac-worker.js", import.meta.url), { type: "module" });
+  const id = crypto.getRandomValues(new Uint32Array(1))[0];
+  try {
+    return await new Promise<BrowserToolResult>((resolvePromise, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Timed out waiting for browser ffmpac"));
+      }, 180_000);
+      worker.addEventListener("message", (event: MessageEvent<BrowserWorkerResponse>) => {
+        const response = event.data;
+        if (response.id !== id) {
+          return;
+        }
+        clearTimeout(timeout);
+        if (!response.ok) {
+          reject(
+            new Error(
+              response.stderrText !== undefined && response.stderrText.length > 0
+                ? response.stderrText
+                : response.error,
+            ),
+          );
+          return;
+        }
+        resolvePromise({
+          exitCode: response.exitCode,
+          outputFile: response.outputFile,
+          stderrText: response.stderrText,
+          stdoutText: response.stdoutText,
+        });
+      });
+      worker.addEventListener("error", (event) => {
+        clearTimeout(timeout);
+        reject(new Error(event.message));
+      });
+      worker.postMessage(
+        {
+          args: options.args,
+          id,
+          inputBuffer,
+          inputPath: options.inputPath,
+          outputPath: options.outputPath,
+          tool,
+        },
+        [inputBuffer],
+      );
+    });
+  } finally {
+    worker.terminate();
+  }
 }
 
 function buildQuery() {
@@ -646,9 +756,16 @@ function buildQuery() {
 
 function buildDisplayArgs(): string[] {
   const input = state.file?.name ?? "input.mp4";
+  return buildBackendArgs(input, displayOutputName());
+}
+
+function buildBackendArgs(input: string, output: string): string[] {
   switch (state.operation) {
     case "clip-mp4": {
       return [
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-ss",
         elements.startInput.value,
         "-i",
@@ -663,11 +780,14 @@ function buildDisplayArgs(): string[] {
         "copy",
         "-movflags",
         "+faststart",
-        "clip.mp4",
+        output,
       ];
     }
     case "poster-png": {
       return [
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-ss",
         elements.frameInput.value,
         "-i",
@@ -676,11 +796,16 @@ function buildDisplayArgs(): string[] {
         "1",
         "-vf",
         `scale=${elements.widthSelect.value}:-2`,
-        "poster.png",
+        "-update",
+        "1",
+        output,
       ];
     }
     case "video-mp4": {
       return [
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-ss",
         elements.startInput.value,
         "-i",
@@ -696,11 +821,14 @@ function buildDisplayArgs(): string[] {
         "-an",
         "-movflags",
         "+faststart",
-        "smaller.mp4",
+        output,
       ];
     }
     case "audio-mp3": {
       return [
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-i",
         input,
         "-vn",
@@ -710,11 +838,14 @@ function buildDisplayArgs(): string[] {
         elements.sampleRateSelect.value,
         "-b:a",
         elements.bitrateSelect.value,
-        "audio.mp3",
+        output,
       ];
     }
     case "audio-wav": {
       return [
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-i",
         input,
         "-vn",
@@ -724,11 +855,14 @@ function buildDisplayArgs(): string[] {
         elements.sampleRateSelect.value,
         "-sample_fmt",
         "s16",
-        "audio.wav",
+        output,
       ];
     }
     case "hash-raw": {
       return [
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-ss",
         elements.frameInput.value,
         "-i",
@@ -741,13 +875,43 @@ function buildDisplayArgs(): string[] {
         "rawvideo",
         "-pix_fmt",
         "gray",
-        "frame-gray.raw",
+        output,
       ];
     }
     default: {
       throw new Error("Unsupported operation");
     }
   }
+}
+
+function displayOutputName() {
+  switch (state.operation) {
+    case "clip-mp4": {
+      return "clip.mp4";
+    }
+    case "poster-png": {
+      return "poster.png";
+    }
+    case "video-mp4": {
+      return "smaller.mp4";
+    }
+    case "audio-mp3": {
+      return "audio.mp3";
+    }
+    case "audio-wav": {
+      return "audio.wav";
+    }
+    case "hash-raw": {
+      return "frame-gray.raw";
+    }
+    default: {
+      throw new Error("Unsupported operation");
+    }
+  }
+}
+
+function backendOutputName() {
+  return displayOutputName();
 }
 
 function savePickerOptions(output: RenderOutput | null = state.lastOutput): BrowserSaveOptions {
@@ -866,8 +1030,13 @@ function playgroundHeaders() {
   return { "X-Playground-Token": playgroundToken };
 }
 
-function hasBackend() {
+function hasServerBackend() {
   return playgroundToken.length > 0;
+}
+
+function inputExtension(name: string) {
+  const match = /\.[a-z0-9]{1,8}$/iu.exec(name);
+  return match?.[0].toLowerCase() ?? ".mp4";
 }
 
 function formatSeconds(value: number) {

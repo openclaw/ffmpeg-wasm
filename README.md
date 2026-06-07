@@ -148,11 +148,11 @@ pnpm check
 
 `pnpm build` compiles TypeScript, fetches the configured FFmpeg/LAME refs into `.cache/`, builds static LAME, builds FFmpeg/FFprobe wasm, and writes generated assets to `dist/`.
 
-`pnpm docs:build` builds the static site into `dist/docs-site`: the media workbench at `/`, its compiled TypeScript client, and documentation under `/docs/`.
+`pnpm docs:build` builds the static site into `dist/docs-site`: the media workbench at `/`, its compiled TypeScript client and browser ffmpac worker, the browser wasm bundle, and documentation under `/docs/`.
 
 `pnpm playground` starts a local one-page media bench at `http://127.0.0.1:4173`. It lets you load a video, choose a supported preset, inspect the generated FFmpeg args, render through the wasm wrapper, preview the output inline, and save via the browser file picker or download fallback.
 
-`pnpm playground:e2e` starts the playground on a temporary port, launches Chrome through DevTools, loads the sample video, renders a smaller MP4 and an MP3, and writes `.tmp/playground-e2e.png` for visual proof.
+`pnpm playground:e2e` starts the playground on a temporary port, launches Chrome through DevTools, loads the sample video, renders a smaller MP4 and an MP3, and writes `.tmp/playground-e2e.png` for visual proof. Set `PLAYGROUND_E2E_STATIC=1` to test the static `dist/docs-site` workbench with `/api/*` blocked and only browser ffmpac available.
 
 `pnpm verify` creates a tiny native test video, then exercises FFprobe text and JSON output, WAV/MP3 extraction, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, segmentation, cwd/dist overrides, API validation failures, and CLI success/failure paths.
 
@@ -253,8 +253,8 @@ To keep the binary small, only add codecs, demuxers, muxers, filters, or protoco
 
 Useful places:
 
-- `playground/`: one-page local editor assets and TypeScript client.
-- `docs/`: GitHub Pages source docs and screenshot assets.
+- `playground/`: one-page local editor assets, TypeScript client, and browser ffmpac worker.
+- `docs/`: Cloudflare Pages source docs and screenshot assets.
 - `scripts/build.ts`: configure flags and Emscripten linker flags.
 - `scripts/build-docs-site.ts`: static docs site builder.
 - `scripts/playground-server.ts`: local editor server and render endpoints.
@@ -267,6 +267,6 @@ GitHub Actions runs two jobs:
 
 - TypeScript, lint, and format on Node 24.
 - Static docs site build.
-- Full live wasm E2E with Emscripten, build caching, and `dist/` artifact upload.
+- Full live wasm E2E with Emscripten, server and static browser workbench tests, build caching, and `dist/` artifact upload.
 
 CI intentionally builds from source instead of trusting checked-in wasm output. `dist/` is ignored and regenerated.

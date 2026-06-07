@@ -6,14 +6,16 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const cache = resolve(root, ".cache");
-const srcDir = resolve(cache, "FFmpeg");
+const browserSrcDir = resolve(cache, "FFmpeg-browser");
 const lameDir = resolve(cache, "lame");
+const nodeSrcDir = resolve(cache, "FFmpeg");
 const prefix = resolve(cache, "prefix");
 const dist = resolve(root, "dist");
+const browserDist = resolve(dist, "browser");
 const ffmpegTag = process.env.FFMPEG_VERSION ?? "n8.1.1";
 const lameRef = process.env.LAME_REF ?? "master";
 
-const configureFlags = [
+const commonConfigureFlags = [
   "--target-os=none",
   "--arch=x86_32",
   "--enable-cross-compile",
@@ -27,9 +29,6 @@ const configureFlags = [
   "--disable-network",
   "--disable-iconv",
   "--disable-runtime-cpudetect",
-  "--enable-pthreads",
-  "--disable-w32threads",
-  "--disable-os2threads",
   "--enable-ffmpeg",
   "--enable-ffprobe",
   "--disable-ffplay",
@@ -54,12 +53,32 @@ const configureFlags = [
   "--nm=emnm",
   "--pkg-config-flags=--static",
   "--optflags=-Oz",
+];
+
+const nodeConfigureFlags = [
+  ...commonConfigureFlags,
+  "--enable-pthreads",
+  "--disable-w32threads",
+  "--disable-os2threads",
   `--extra-cflags=-Oz -pthread -sUSE_ZLIB=1 -I${resolve(prefix, "include")}`,
   `--extra-ldflags=-Oz -pthread -sUSE_ZLIB=1 -L${resolve(prefix, "lib")}`,
 ];
 
-const exeFlags = [
+const browserConfigureFlags = [
+  ...commonConfigureFlags,
+  "--enable-pthreads",
+  "--disable-w32threads",
+  "--disable-os2threads",
+  `--extra-cflags=-Oz -pthread -sUSE_ZLIB=1 -I${resolve(prefix, "include")}`,
+  `--extra-ldflags=-Oz -pthread -sUSE_ZLIB=1 -L${resolve(prefix, "lib")}`,
+];
+
+const nodeExeFlags = [
   "LDEXEFLAGS=-Oz -pthread -sUSE_ZLIB=1 -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sPTHREAD_POOL_SIZE=4 -sPROXY_TO_PTHREAD=1 -sEXIT_RUNTIME=1 -sEXPORTED_RUNTIME_METHODS=FS,callMain",
+];
+
+const browserExeFlags = [
+  "LDEXEFLAGS=-Oz -pthread -sUSE_ZLIB=1 -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker -sALLOW_MEMORY_GROWTH=1 -sPTHREAD_POOL_SIZE=4 -sPROXY_TO_PTHREAD=1 -sEXIT_RUNTIME=1 -sEXPORTED_RUNTIME_METHODS=FS,callMain",
 ];
 
 interface RunOptions {
@@ -81,7 +100,8 @@ function run(cmd: string, args: string[], options: RunOptions = {}) {
 }
 
 mkdirSync(cache, { recursive: true });
-ensureCheckout(srcDir, "https://github.com/FFmpeg/FFmpeg.git", ffmpegTag);
+ensureCheckout(nodeSrcDir, "https://github.com/FFmpeg/FFmpeg.git", ffmpegTag);
+ensureCheckout(browserSrcDir, "https://github.com/FFmpeg/FFmpeg.git", ffmpegTag);
 ensureCheckout(lameDir, "https://github.com/ffmpegwasm/lame.git", lameRef);
 
 rmSync(prefix, { recursive: true, force: true });
@@ -103,22 +123,15 @@ run(
 );
 run("emmake", ["make", "-j", String(parallelJobs()), "install"], { cwd: lameDir });
 
-run("emmake", ["make", "distclean"], { cwd: srcDir, allowFailure: true });
-run("emconfigure", ["./configure", ...configureFlags], {
-  cwd: srcDir,
-  env: { PKG_CONFIG_PATH: resolve(prefix, "lib", "pkgconfig") },
-});
-run("emmake", ["make", "-j", String(parallelJobs()), "ffmpeg", "ffprobe", ...exeFlags], {
-  cwd: srcDir,
-});
-
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
-for (const name of ["ffmpeg", "ffprobe"]) {
-  cpSync(resolve(srcDir, name), resolve(dist, `${name}.js`));
-  cpSync(resolve(srcDir, name), resolve(dist, `${name}_g`));
-  cpSync(resolve(srcDir, `${name}_g.wasm`), resolve(dist, `${name}_g.wasm`));
-}
+buildFfmpeg(nodeSrcDir, nodeConfigureFlags, nodeExeFlags);
+copyGeneratedTools(nodeSrcDir, dist);
+
+buildFfmpeg(browserSrcDir, browserConfigureFlags, browserExeFlags);
+mkdirSync(browserDist, { recursive: true });
+copyGeneratedTools(browserSrcDir, browserDist);
+
 for (const name of [
   "LICENSE.md",
   "COPYING.LGPLv2.1",
@@ -126,7 +139,7 @@ for (const name of [
   "COPYING.GPLv2",
   "COPYING.GPLv3",
 ]) {
-  cpSync(resolve(srcDir, name), resolve(dist, name));
+  cpSync(resolve(nodeSrcDir, name), resolve(dist, name));
 }
 
 function parallelJobs() {
@@ -139,4 +152,28 @@ function ensureCheckout(dir: string, repo: string, ref: string) {
   }
   run("git", ["fetch", "--depth", "1", "origin", ref], { cwd: dir });
   run("git", ["checkout", "--force", "--detach", "FETCH_HEAD"], { cwd: dir });
+}
+
+function buildFfmpeg(srcDir: string, configureFlags: string[], exeFlags: string[]) {
+  run("emmake", ["make", "distclean"], { cwd: srcDir, allowFailure: true });
+  run("emconfigure", ["./configure", ...configureFlags], {
+    cwd: srcDir,
+    env: { PKG_CONFIG_PATH: resolve(prefix, "lib", "pkgconfig") },
+  });
+  run("emmake", ["make", "-j", String(parallelJobs()), "ffmpeg", "ffprobe", ...exeFlags], {
+    cwd: srcDir,
+  });
+}
+
+function copyGeneratedTools(srcDir: string, outputDir: string) {
+  mkdirSync(outputDir, { recursive: true });
+  for (const name of ["ffmpeg", "ffprobe"]) {
+    cpSync(resolve(srcDir, name), resolve(outputDir, `${name}.js`));
+    cpSync(resolve(srcDir, name), resolve(outputDir, `${name}_g`));
+    cpSync(resolve(srcDir, `${name}_g.wasm`), resolve(outputDir, `${name}_g.wasm`));
+    const workerPath = resolve(srcDir, `${name}.worker.js`);
+    if (existsSync(workerPath)) {
+      cpSync(workerPath, resolve(outputDir, `${name}.worker.js`));
+    }
+  }
 }

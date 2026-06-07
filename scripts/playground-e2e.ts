@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync } from "node:fs";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { request as httpRequest } from "node:http";
+import { createReadStream, existsSync, statSync } from "node:fs";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { createServer, request as httpRequest, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
+import { pipeline } from "node:stream/promises";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const port = String(4174 + Math.floor(Math.random() * 1000));
 const baseUrl = `http://127.0.0.1:${port}`;
 const screenshotPath = resolve(root, ".tmp", "playground-e2e.png");
+await mkdir(dirname(screenshotPath), { recursive: true });
 const chromePath = process.env.CHROME_PATH ?? resolveChromePath();
+const staticMode = process.env.PLAYGROUND_E2E_STATIC === "1";
 
 interface CdpError {
   message: string;
@@ -107,16 +110,14 @@ class CdpClient {
 
 const clients = new WeakMap<WebSocket, CdpClient>();
 
-const server = spawn(process.execPath, [resolve(root, "lib", "scripts", "playground-server.js")], {
-  env: {
-    ...process.env,
-    FFMPEG_WASM_PLAYGROUND_PORT: port,
-  },
-});
+const server = staticMode ? startStaticServer() : startPlaygroundServer();
 
 try {
   await waitForServer(server);
-  await assertHostGuard();
+  await assertHostGuard(staticMode);
+  if (staticMode) {
+    await assertStaticMode();
+  }
   const profileDir = await mkdtemp(join(tmpdir(), "ffmpeg-wasm-chrome-"));
   const chromeArgs = [
     `--remote-debugging-port=${Number(port) + 10}`,
@@ -188,8 +189,9 @@ try {
         format: "png",
       });
       await writeFile(screenshotPath, Buffer.from(asStringField(screenshot, "data"), "base64"));
+      const mode = staticMode ? "static" : "server";
       console.log(
-        `playground e2e ok (${videoState.lastRender.name}, ${audioState.lastRender.name})`,
+        `playground e2e ok (${mode}, ${videoState.lastRender.name}, ${audioState.lastRender.name})`,
       );
       console.log(`screenshot: ${screenshotPath}`);
     } catch (error) {
@@ -203,6 +205,100 @@ try {
   }
 } finally {
   stop(server);
+}
+
+function startPlaygroundServer() {
+  return spawn(process.execPath, [resolve(root, "lib", "scripts", "playground-server.js")], {
+    env: {
+      ...process.env,
+      FFMPEG_WASM_PLAYGROUND_PORT: port,
+    },
+  });
+}
+
+function startStaticServer() {
+  const siteDir = resolve(root, "dist", "docs-site");
+  return createServer((request, response) => {
+    // oxlint-disable-next-line promise/prefer-await-to-callbacks, promise/prefer-await-to-then -- Node HTTP request handlers are callback based.
+    handleStaticRequest(siteDir, request.url ?? "/", response).catch((error: unknown) => {
+      response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+      response.end(error instanceof Error ? error.message : "Static server failed");
+    });
+  }).listen(Number(port), "127.0.0.1");
+}
+
+async function handleStaticRequest(siteDir: string, rawUrl: string, response: ServerResponse) {
+  const url = new URL(rawUrl, baseUrl);
+  if (url.pathname.startsWith("/api/")) {
+    response.writeHead(404, securityHeaders("text/plain; charset=utf-8"));
+    response.end("Not found");
+    return;
+  }
+  const filePath = staticFilePath(siteDir, url.pathname);
+  if (!existsSync(filePath)) {
+    response.writeHead(404, securityHeaders("text/plain; charset=utf-8"));
+    response.end("Not found");
+    return;
+  }
+  const size = statSync(filePath).size;
+  response.writeHead(200, {
+    ...securityHeaders(contentType(filePath)),
+    "Content-Length": String(size),
+  });
+  await pipeline(createReadStream(filePath), response);
+}
+
+function staticFilePath(siteDir: string, pathname: string) {
+  const decoded = decodeURIComponent(pathname);
+  const candidate = decoded.endsWith("/") ? `${decoded}index.html` : decoded;
+  const filePath = resolve(siteDir, `.${candidate}`);
+  const rel = relative(siteDir, filePath);
+  if (rel.startsWith("..") || rel.includes(`..${sep}`) || rel === "") {
+    return resolve(siteDir, "404");
+  }
+  if (!existsSync(filePath) && extname(filePath) === "") {
+    return resolve(filePath, "index.html");
+  }
+  return filePath;
+}
+
+function securityHeaders(contentTypeValue: string) {
+  return {
+    "Content-Type": contentTypeValue,
+    "Cross-Origin-Embedder-Policy": "require-corp",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "X-Content-Type-Options": "nosniff",
+  };
+}
+
+function contentType(filePath: string) {
+  switch (extname(filePath)) {
+    case ".css": {
+      return "text/css; charset=utf-8";
+    }
+    case ".html": {
+      return "text/html; charset=utf-8";
+    }
+    case ".js": {
+      return "text/javascript; charset=utf-8";
+    }
+    case ".json": {
+      return "application/json; charset=utf-8";
+    }
+    case ".mp4": {
+      return "video/mp4";
+    }
+    case ".png": {
+      return "image/png";
+    }
+    case ".wasm": {
+      return "application/wasm";
+    }
+    default: {
+      return "text/javascript; charset=utf-8";
+    }
+  }
 }
 
 function resolveChromePath() {
@@ -222,7 +318,7 @@ function resolveChromePath() {
   throw new Error("Chrome not found. Set CHROME_PATH to run playground:e2e.");
 }
 
-async function assertHostGuard() {
+async function assertHostGuard(expectForbidden: boolean) {
   const status = await new Promise<number>((resolvePromise, reject) => {
     const request = httpRequest(
       {
@@ -242,9 +338,36 @@ async function assertHostGuard() {
     request.on("error", reject);
     request.end();
   });
-  if (status !== 403) {
-    throw new Error(`Expected Host guard to reject rebinding request, got ${status}`);
+  const expected = expectForbidden ? 200 : 403;
+  if (status !== expected) {
+    throw new Error(`Expected Host guard status ${expected}, got ${status}`);
   }
+}
+
+async function assertStaticMode() {
+  const apiStatus = await responseStatus("/api/sample");
+  if (apiStatus !== 404) {
+    throw new Error(`Expected static mode to reject API routes, got ${apiStatus}`);
+  }
+  const headers = await responseHeaders("/");
+  if (headers.get("cross-origin-opener-policy") !== "same-origin") {
+    throw new Error("Static mode missing Cross-Origin-Opener-Policy");
+  }
+  if (headers.get("cross-origin-embedder-policy") !== "require-corp") {
+    throw new Error("Static mode missing Cross-Origin-Embedder-Policy");
+  }
+}
+
+async function responseStatus(path: string) {
+  const response = await fetch(`${baseUrl}${path}`);
+  await response.body?.cancel();
+  return response.status;
+}
+
+async function responseHeaders(path: string) {
+  const response = await fetch(`${baseUrl}${path}`);
+  await response.body?.cancel();
+  return response.headers;
 }
 
 async function writeFailureState(cdp: CdpClient) {
@@ -395,7 +518,13 @@ async function waitFor(cdp: CdpClient, expression: string, timeout = 60_000) {
   throw new Error(`Timed out waiting for ${expression}`);
 }
 
-async function waitForServer(serverProcess: ChildProcessWithoutNullStreams) {
+async function waitForServer(
+  serverProcess: ChildProcessWithoutNullStreams | ReturnType<typeof createServer>,
+) {
+  if (!("stdout" in serverProcess)) {
+    await waitForStaticServer();
+    return;
+  }
   let output = "";
   await new Promise<void>((resolvePromise, reject) => {
     const timeout = setTimeout(() => {
@@ -418,6 +547,26 @@ async function waitForServer(serverProcess: ChildProcessWithoutNullStreams) {
   });
 }
 
+async function waitForStaticServer() {
+  const started = Date.now();
+  while (Date.now() - started < 30_000) {
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- Polling local static server startup must be sequential.
+      const response = await fetch(baseUrl);
+      // oxlint-disable-next-line no-await-in-loop -- Polling local static server startup must be sequential.
+      await response.body?.cancel();
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // Wait for listen to bind.
+    }
+    // oxlint-disable-next-line no-await-in-loop -- Polling local static server startup must be sequential.
+    await sleep(250);
+  }
+  throw new Error("Static playground server did not start");
+}
+
 async function jsonGet(url: string) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -427,7 +576,11 @@ async function jsonGet(url: string) {
   return value;
 }
 
-function stop(child: ChildProcessWithoutNullStreams) {
+function stop(child: ChildProcessWithoutNullStreams | ReturnType<typeof createServer>) {
+  if (!("killed" in child)) {
+    child.close();
+    return;
+  }
   if (!child.killed) {
     child.kill();
   }

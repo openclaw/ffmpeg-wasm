@@ -1,4 +1,4 @@
-name: Pages
+name: Cloudflare Pages
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     paths:
       - "docs/**"
       - "playground/**"
+      - "scripts/build.ts"
       - "scripts/build-docs-site.ts"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -15,21 +16,20 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: cloudflare-pages
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy docs
+    name: Deploy static workbench
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 60
+    env:
+      EM_CACHE: ${{ github.workspace }}/.cache/emcache
+      FFMPEG_VERSION: n8.1.1
+      LAME_REF: master
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -48,19 +48,44 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build docs site
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            autoconf \
+            automake \
+            build-essential \
+            ffmpeg \
+            gawk \
+            libtool \
+            nasm \
+            pkg-config \
+            yasm
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
+        with:
+          version: 4.0.23
+          actions-cache-folder: emsdk-cache
+
+      - name: Restore build cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            .cache/FFmpeg
+            .cache/FFmpeg-browser
+            .cache/lame
+            .cache/emcache
+          key: pages-wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
+          restore-keys: |
+            pages-wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-
+            pages-wasm-${{ runner.os }}-
+
+      - name: Build deployable site
         run: pnpm docs:build
 
-      - name: Configure Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-        with:
-          enablement: true
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: dist/docs-site
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      - name: Deploy to Cloudflare Pages
+        run: pnpm exec wrangler pages deploy dist/docs-site --project-name ffmpeg-sh-site --branch main
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
