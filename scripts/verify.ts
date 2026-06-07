@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { execFfmpeg, runFfmpeg, runFfprobe, type RunResult } from "../src/index.js";
+import { execFfmpeg, execFfprobe, runFfmpeg, runFfprobe, type RunResult } from "../src/index.js";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const work = mkdtempSync(join(tmpdir(), "ffmpeg-wasm-verify-"));
+const missingDist = join(work, "missing-dist");
 
 try {
   const input = join(work, "input.mp4");
@@ -14,8 +15,11 @@ try {
   const mp3 = join(work, "audio.mp3");
   const png = join(work, "frame.png");
   const raw = join(work, "hash.raw");
+  const relativeCwd = join(work, "relative-cwd");
+  const relativeWav = "cwd-audio.wav";
   const segments = join(work, "part-%03d.wav");
   const mp3Segments = join(work, "mp3-part-%03d.mp3");
+  mkdirSync(relativeCwd);
 
   native("ffmpeg", [
     "-hide_banner",
@@ -39,6 +43,9 @@ try {
   ]);
 
   await step("ffprobe duration", () => okProbe(input));
+  await step("ffprobe json streams", () => okProbeJson(input));
+  await step("ffprobe explicit distDir", () => okExplicitDist(input));
+  await step("exec ffprobe version", () => okExecFfprobeVersion());
   await step("wav transcode", () =>
     okFfmpeg([
       "-hide_banner",
@@ -73,10 +80,21 @@ try {
       mp3,
     ]),
   );
+  await step("relative cwd output", () => okRelativeCwdOutput(input, relativeCwd, relativeWav));
   await step("API wav stdin pipe", () => okWavStdin(wav));
   await step("exec wav stdin pipe", () => okExecWavStdin(wav));
+  await step("API missing dist rejects", () => okMissingDistRejects());
+  await step("API invalid args rejects", () => {
+    okInvalidArgsRejects();
+  });
   await step("CLI wav stdin pipe", () => {
     okCliWavStdin(wav);
+  });
+  await step("CLI ffprobe duration", () => {
+    okCliProbe(input);
+  });
+  await step("CLI failure stderr", () => {
+    okCliFailure();
   });
   await step("png frame", () =>
     okFfmpeg([
@@ -164,6 +182,7 @@ try {
 
   assertFile(wav, 1024, "wav transcode");
   assertFile(mp3, 1024, "mp3 transcode");
+  assertFile(join(relativeCwd, relativeWav), 1024, "relative cwd transcode");
   assertFile(png, 1024, "png frame");
   assertFile(raw, 1024, "raw hash frame");
   assertFile(join(work, "part-000.wav"), 1024, "segment 0");
@@ -173,6 +192,21 @@ try {
   console.log(`verify ok (${size})`);
 } finally {
   rmSync(work, { recursive: true, force: true });
+}
+
+interface ProbeStream {
+  codec_type?: unknown;
+  width?: unknown;
+  height?: unknown;
+}
+
+interface ProbeFormat {
+  duration?: unknown;
+}
+
+interface ProbeJson {
+  streams: ProbeStream[];
+  format: ProbeFormat | null;
 }
 
 async function okProbe(input: string) {
@@ -197,10 +231,114 @@ async function okProbe(input: string) {
   }
 }
 
+async function okProbeJson(input: string) {
+  const result = await runFfprobe(
+    ["-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", input],
+    { timeoutMs: 30_000 },
+  );
+  if (result.exitCode !== 0) {
+    fail("ffprobe json", result);
+  }
+  const parsed = parseProbeJson(result.stdoutText);
+  const video = parsed.streams.find((stream) => stream.codec_type === "video");
+  const audio = parsed.streams.find((stream) => stream.codec_type === "audio");
+  if (!video) {
+    throw new Error("ffprobe json missing video stream");
+  }
+  if (!audio) {
+    throw new Error("ffprobe json missing audio stream");
+  }
+  const duration = Number(parsed.format?.duration);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error(`ffprobe json bad duration: ${String(parsed.format?.duration)}`);
+  }
+  if (video.width !== 160 || video.height !== 90) {
+    throw new Error(`ffprobe json bad video size: ${String(video.width)}x${String(video.height)}`);
+  }
+}
+
+async function okExplicitDist(input: string) {
+  const result = await runFfprobe(
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      input,
+    ],
+    { distDir: join(root, "dist"), timeoutMs: 30_000 },
+  );
+  if (result.exitCode !== 0) {
+    fail("ffprobe explicit distDir", result);
+  }
+  const duration = Number(result.stdoutText.trim());
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error(`explicit distDir bad duration: ${result.stdoutText}`);
+  }
+}
+
+async function okExecFfprobeVersion() {
+  const exitCode = await execFfprobe(["-version"], { timeoutMs: 30_000 });
+  if (exitCode !== 0) {
+    throw new Error(`ffprobe exec version failed: ${exitCode}`);
+  }
+}
+
 async function okFfmpeg(args: string[]) {
   const result = await runFfmpeg(args, { timeoutMs: 30_000 });
   if (result.exitCode !== 0) {
     fail(`ffmpeg ${args.join(" ")}`, result);
+  }
+}
+
+async function okRelativeCwdOutput(input: string, cwd: string, output: string) {
+  const result = await runFfmpeg(
+    ["-hide_banner", "-loglevel", "error", "-i", input, "-vn", "-ac", "1", "-ar", "8000", output],
+    { cwd, timeoutMs: 30_000 },
+  );
+  if (result.exitCode !== 0) {
+    fail("ffmpeg relative cwd", result);
+  }
+}
+
+async function okMissingDistRejects() {
+  try {
+    await runFfmpeg(["-version"], { distDir: missingDist, timeoutMs: 30_000 });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("Missing ffmpeg wasm assets") &&
+      error.message.includes(missingDist)
+    ) {
+      return;
+    }
+    throw error;
+  }
+  throw new Error("missing distDir did not reject");
+}
+
+function okInvalidArgsRejects() {
+  const source = `
+import { runFfmpeg } from ${JSON.stringify(resolve(root, "lib/src/index.js"))};
+try {
+  await runFfmpeg("not-an-array");
+  console.error("invalid args did not reject");
+  process.exit(1);
+} catch (error) {
+  if (error instanceof TypeError && error.message.includes("args must be an array")) {
+    process.exit(0);
+  }
+  console.error(error);
+  process.exit(1);
+}
+`;
+  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", source], {
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    throw new Error(`invalid args check failed: ${spawnOutput(result)}`);
   }
 }
 
@@ -230,6 +368,54 @@ function okCliWavStdin(wav: string) {
   });
   if (result.status !== 0) {
     throw new Error(`ffmpeg CLI wav stdin failed: ${spawnOutput(result)}`);
+  }
+}
+
+function okCliProbe(input: string) {
+  const result = spawnSync(
+    process.execPath,
+    [
+      resolve(root, "lib/src/ffprobe-cli.js"),
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      input,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    throw new Error(`ffprobe CLI duration failed: ${spawnOutput(result)}`);
+  }
+  const duration = Number(result.stdout.trim());
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error(`ffprobe CLI bad duration: ${result.stdout}`);
+  }
+}
+
+function okCliFailure() {
+  const result = spawnSync(
+    process.execPath,
+    [
+      resolve(root, "lib/src/cli.js"),
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-i",
+      join(work, "missing.mp4"),
+      "-f",
+      "null",
+      "-",
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status === 0) {
+    throw new Error("ffmpeg CLI failure path unexpectedly succeeded");
+  }
+  if (!result.stderr.includes("No such file")) {
+    throw new Error(`ffmpeg CLI failure path missing stderr: ${spawnOutput(result)}`);
   }
 }
 
@@ -299,6 +485,37 @@ function assertSameBytes(actual: Buffer, expected: Buffer, label: string) {
   if (!actual.equals(expected)) {
     throw new Error(`${label} mismatch`);
   }
+}
+
+function parseProbeJson(text: string): ProbeJson {
+  const value: unknown = JSON.parse(text);
+  if (!isRecord(value)) {
+    throw new Error("ffprobe json root is not an object");
+  }
+  const rawStreams = value.streams;
+  const streams = Array.isArray(rawStreams)
+    ? rawStreams.flatMap((stream): ProbeStream[] => {
+        if (!isRecord(stream)) {
+          return [];
+        }
+        return [
+          {
+            codec_type: stream.codec_type,
+            height: stream.height,
+            width: stream.width,
+          },
+        ];
+      })
+    : [];
+  const rawFormat = value.format;
+  return {
+    streams,
+    format: isRecord(rawFormat) ? { duration: rawFormat.duration } : null,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function native(cmd: string, args: string[]) {

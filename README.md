@@ -131,12 +131,15 @@ brew install autoconf automake ffmpeg libtool nasm pkg-config yasm
 ```sh
 pnpm build
 pnpm verify
+pnpm test:e2e
 pnpm check
 ```
 
 `pnpm build` compiles TypeScript, fetches the configured FFmpeg/LAME refs into `.cache/`, builds static LAME, builds FFmpeg/FFprobe wasm, and writes generated assets to `dist/`.
 
-`pnpm verify` creates a tiny native test video, then exercises FFprobe, WAV/MP3 extraction, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, and segmentation.
+`pnpm verify` creates a tiny native test video, then exercises FFprobe text and JSON output, WAV/MP3 extraction, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, segmentation, cwd/dist overrides, API validation failures, and CLI success/failure paths.
+
+`pnpm test:e2e` rebuilds the wasm assets from source, then runs the same live verifier against the generated FFmpeg/FFprobe wrappers.
 
 `pnpm check` runs `tsgo`, strict `oxlint`, and `oxfmt --check`.
 
@@ -241,6 +244,6 @@ Useful places:
 GitHub Actions runs two jobs:
 
 - TypeScript, lint, and format on Node 24.
-- Full wasm build and verification with Emscripten, build caching, and `dist/` artifact upload.
+- Full live wasm E2E with Emscripten, build caching, and `dist/` artifact upload.
 
 CI intentionally builds from source instead of trusting checked-in wasm output. `dist/` is ignored and regenerated.

@@ -23,6 +23,7 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --tsconfig tsconfig.json --deny-warnings .",
+    "test:e2e": "pnpm build && pnpm verify",
     "verify": "pnpm compile && node lib/scripts/verify.js"
   },
   "devDependencies": {
