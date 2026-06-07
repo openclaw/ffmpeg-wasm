@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/openclaw/ffmpeg-wasm/actions/workflows/ci.yml/badge.svg)](https://github.com/openclaw/ffmpeg-wasm/actions/workflows/ci.yml)
 
-Lightweight FFmpeg and FFprobe for Node, built as modern WebAssembly for local OpenClaw/Summarize use.
+Lightweight FFmpeg and FFprobe for Node, built as modern WebAssembly for local media automation.
 
 This repository is intentionally small in scope: one reproducible Emscripten build, one TypeScript wrapper, and enough codecs/protocols for media inspection, audio extraction, thumbnails, pipe I/O, and segmentation.
 
 ## Why
 
-`../summarize` needs a predictable local media toolchain without shipping a full native FFmpeg bundle. This package builds a narrow LGPL FFmpeg wasm core and exposes it through:
+Many media workflows need predictable FFmpeg and FFprobe behavior without carrying a full native FFmpeg bundle. This package builds a narrow LGPL FFmpeg wasm core and exposes it through:
 
 - `ffmpeg-wasm`, a CLI-compatible FFmpeg entrypoint.
 - `ffprobe-wasm`, a CLI-compatible FFprobe entrypoint.
