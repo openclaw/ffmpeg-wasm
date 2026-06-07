@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: TypeScript, lint, format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        run: pnpm check
+
+  wasm:
+    name: Build and verify wasm
+    runs-on: ubuntu-latest
+    env:
+      EM_CACHE: ${{ github.workspace }}/.cache/emcache
+      FFMPEG_VERSION: n8.1.1
+      LAME_REF: master
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            autoconf \
+            automake \
+            build-essential \
+            ffmpeg \
+            gawk \
+            libtool \
+            nasm \
+            pkg-config \
+            yasm
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/FFmpeg
+            .cache/lame
+            .cache/emcache
+          key: wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
+          restore-keys: |
+            wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-
+            wasm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify
+        run: pnpm verify
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-wasm-dist
+          path: dist

@@ -1,0 +1,7 @@
+{
+  "env": {
+    "node": true,
+    "es2024": true
+  },
+  "ignorePatterns": ["dist/**", "lib/**", ".cache/**"]
+}
