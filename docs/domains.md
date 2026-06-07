@@ -5,14 +5,22 @@ description: "GitHub Pages domain layout for ffmpeg.sh and docs.ffmpeg.sh."
 
 # Domains
 
-The Pages artifact ships `CNAME` as:
+GitHub Pages serves the canonical site at:
 
 ```txt
 ffmpeg.sh
 ```
 
-That makes the root landing page `https://ffmpeg.sh/`.
+The Pages artifact ships `CNAME` with only `ffmpeg.sh`, because GitHub Pages
+artifacts support one canonical custom domain.
 
-The documentation index is also available inside the same site at `https://ffmpeg.sh/docs/`. If `docs.ffmpeg.sh` is configured as an additional Pages/DNS alias, point it at the same Pages target and route it to the docs index.
+DNS is hosted in Cloudflare:
 
-GitHub Pages artifacts only carry one `CNAME` file, so the repository keeps the deployable canonical domain as `ffmpeg.sh`.
+| Host             | Type    | Target                                                                                     | Proxy    |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------ | -------- |
+| `ffmpeg.sh`      | `A`     | `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`                 | DNS only |
+| `ffmpeg.sh`      | `AAAA`  | `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153` | DNS only |
+| `www.ffmpeg.sh`  | `CNAME` | `openclaw.github.io`                                                                       | DNS only |
+| `docs.ffmpeg.sh` | `A`     | `192.0.2.1`                                                                                | Proxied  |
+
+Cloudflare redirects `docs.ffmpeg.sh/*` to `https://ffmpeg.sh/docs/$1`.
