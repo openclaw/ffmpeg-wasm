@@ -1,4 +1,4 @@
-type Operation = "audio-mp3" | "audio-wav" | "clip-mp4" | "hash-raw" | "poster-png";
+type Operation = "audio-mp3" | "audio-wav" | "clip-mp4" | "hash-raw" | "poster-png" | "video-webm";
 export type WorkbenchOperation = Operation;
 type StatusMode = "busy" | "error" | "idle";
 
@@ -110,6 +110,13 @@ const presets: Preset[] = [
     tone: "green",
   },
   {
+    detail: "Downscaled WebM",
+    extension: ".webm",
+    id: "video-webm",
+    name: "Smaller video",
+    tone: "green",
+  },
+  {
     detail: "Scaled still frame",
     extension: ".png",
     id: "poster-png",
@@ -210,6 +217,7 @@ const elements = {
   parameterTitle: requireElement("#parameterTitle", HTMLElement),
   presetArgsButton: requireElement("#presetArgsButton", HTMLButtonElement),
   presetList: requireElement("#presetList", HTMLElement),
+  qualitySelect: requireElement("#qualitySelect", HTMLSelectElement),
   renderButton: requireElement("#renderButton", HTMLButtonElement),
   renderSaveButton: requireElement("#renderSaveButton", HTMLButtonElement),
   sampleButton: requireElement("#sampleButton", HTMLButtonElement),
@@ -268,6 +276,7 @@ function bindEvents() {
     elements.durationInput,
     elements.frameInput,
     elements.widthSelect,
+    elements.qualitySelect,
     elements.bitrateSelect,
     elements.sampleRateSelect,
     elements.channelsSelect,
@@ -283,10 +292,10 @@ function renderPresets() {
       const button = document.createElement("button");
       button.className = `preset-card${preset.id === state.operation ? " active" : ""}`;
       button.dataset.operation = preset.id;
+      button.dataset.testid = `preset-${preset.id}`;
       button.dataset.tone = preset.tone;
-      button.disabled = preset.id === "audio-mp3" && !hasBackend();
-      if (button.disabled) {
-        button.title = "MP3 output requires the local wasm backend";
+      if (preset.id === "audio-mp3" && !hasBackend()) {
+        button.title = "MP3 rendering needs the local wasm backend; command setup still works.";
       }
       button.type = "button";
       button.innerHTML = `
@@ -481,7 +490,11 @@ async function saveLastOutput() {
 
 function setSourceViewer(file: File, url: string) {
   elements.sourceViewer.className = "media-frame";
-  elements.sourceViewer.replaceChildren(mediaElement(file.type, url, file.name));
+  const element = mediaElement(file.type, url, file.name);
+  if (element instanceof HTMLVideoElement) {
+    bindSourceVideo(element);
+  }
+  elements.sourceViewer.replaceChildren(element);
 }
 
 function setOutputViewer(blob: Blob, url: string) {
@@ -518,6 +531,23 @@ function mediaElement(type: string, url: string, label: string): HTMLElement {
   return block;
 }
 
+function bindSourceVideo(video: HTMLVideoElement) {
+  video.addEventListener("seeked", () => {
+    selectPosterFrame(video.currentTime);
+  });
+}
+
+function selectPosterFrame(seconds: number) {
+  elements.frameInput.value = formatSeconds(seconds);
+  if (state.operation !== "poster-png") {
+    state.operation = "poster-png";
+    state.commandEdited = false;
+    renderPresets();
+    updateControls();
+  }
+  updateCommand();
+}
+
 function setOutputEmpty() {
   elements.outputViewer.className = "media-frame empty";
   elements.outputViewer.replaceChildren(textNode("Render result"));
@@ -546,13 +576,27 @@ function updateControls() {
   const preset = currentPreset();
   elements.parameterTitle.textContent = preset.name;
   for (const field of document.querySelectorAll(".clip-field")) {
-    field.classList.toggle("hidden", state.operation !== "clip-mp4");
+    field.classList.toggle(
+      "hidden",
+      state.operation !== "clip-mp4" && state.operation !== "video-webm",
+    );
   }
   for (const field of document.querySelectorAll(".frame-field")) {
     field.classList.toggle(
       "hidden",
       state.operation !== "poster-png" && state.operation !== "hash-raw",
     );
+  }
+  for (const field of document.querySelectorAll(".size-field")) {
+    field.classList.toggle(
+      "hidden",
+      state.operation !== "poster-png" &&
+        state.operation !== "hash-raw" &&
+        state.operation !== "video-webm",
+    );
+  }
+  for (const field of document.querySelectorAll(".video-quality-field")) {
+    field.classList.toggle("hidden", state.operation !== "video-webm");
   }
   for (const field of document.querySelectorAll(".audio-field")) {
     field.classList.toggle(
@@ -577,6 +621,13 @@ function displayCommand() {
 
 async function renderWithBestBackend(options: RenderOptions = {}): Promise<RenderOutput> {
   const file = sourceFile();
+  if (state.operation === "video-webm") {
+    return {
+      ...(await renderInBrowser()),
+      browserFallback: true,
+      ffmpegArgs: JSON.stringify(buildDisplayArgs()),
+    };
+  }
   try {
     if (!hasBackend()) {
       throw new Error("Static workbench render");
@@ -626,6 +677,9 @@ function renderInBrowser(): Promise<RenderOutput> {
     case "audio-wav": {
       return renderWavInBrowser();
     }
+    case "video-webm": {
+      return renderWebmInBrowser();
+    }
     case "hash-raw": {
       return renderRawFrameInBrowser();
     }
@@ -637,13 +691,20 @@ function renderInBrowser(): Promise<RenderOutput> {
 
 function buildQuery() {
   const query = new URLSearchParams({ op: state.operation });
-  if (state.operation === "clip-mp4") {
+  if (state.operation === "clip-mp4" || state.operation === "video-webm") {
     query.set("start", elements.startInput.value);
     query.set("duration", elements.durationInput.value);
   }
-  if (state.operation === "poster-png" || state.operation === "hash-raw") {
+  if (
+    state.operation === "poster-png" ||
+    state.operation === "hash-raw" ||
+    state.operation === "video-webm"
+  ) {
     query.set("frameTime", elements.frameInput.value);
     query.set("width", elements.widthSelect.value);
+  }
+  if (state.operation === "video-webm") {
+    query.set("quality", elements.qualitySelect.value);
   }
   if (state.operation === "audio-mp3" || state.operation === "audio-wav") {
     query.set("audioBitrate", elements.bitrateSelect.value);
@@ -686,6 +747,26 @@ function buildDisplayArgs(): string[] {
         "-vf",
         `scale=${elements.widthSelect.value}:-2`,
         "poster.png",
+      ];
+    }
+    case "video-webm": {
+      return [
+        "-ss",
+        elements.startInput.value,
+        "-i",
+        input,
+        "-t",
+        elements.durationInput.value,
+        "-vf",
+        `scale=${elements.widthSelect.value}:-2`,
+        "-c:v",
+        "libvpx-vp9",
+        "-crf",
+        videoCrf(elements.qualitySelect.value),
+        "-b:v",
+        "0",
+        "-an",
+        "smaller.webm",
       ];
     }
     case "audio-mp3": {
@@ -884,6 +965,64 @@ async function renderRawFrameInBrowser(): Promise<RenderOutput> {
   return {
     blob: new Blob([gray], { type: "application/octet-stream" }),
     name: `${baseName(file.name)}-frame-gray.raw`,
+  };
+}
+
+async function renderWebmInBrowser(): Promise<RenderOutput> {
+  if (!("MediaRecorder" in globalThis)) {
+    throw new Error("Browser video rendering is unavailable");
+  }
+  const file = sourceFile();
+  const video = await loadedVideoElement(file);
+  const start = Number(elements.startInput.value);
+  const duration = Number(elements.durationInput.value);
+  const width = Number(elements.widthSelect.value);
+  await seekVideo(video, Math.min(start, Math.max(0, video.duration - 0.1)));
+  video.muted = true;
+  video.playbackRate = 1;
+  const ratio = video.videoWidth === 0 ? 9 / 16 : video.videoHeight / video.videoWidth;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = Math.max(2, Math.round(width * ratio));
+  const context = canvas.getContext("2d");
+  if (!context || !hasCanvasCaptureStream(canvas)) {
+    throw new Error("Browser video rendering is unavailable");
+  }
+  const stream = canvas.captureStream(30);
+  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+    ? "video/webm;codecs=vp9"
+    : "video/webm";
+  const recorder = new MediaRecorder(stream, {
+    mimeType: mime,
+    videoBitsPerSecond: videoBitrate(width, elements.qualitySelect.value),
+  });
+  const chunks: Blob[] = [];
+  let frame = 0;
+  const draw = () => {
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    frame = requestAnimationFrame(draw);
+  };
+  recorder.addEventListener("dataavailable", (event) => {
+    if (event.data.size > 0) {
+      chunks.push(event.data);
+    }
+  });
+  const stopped = once(recorder, "stop");
+  frame = requestAnimationFrame(draw);
+  recorder.start();
+  await video.play();
+  const remainingSeconds = Number.isFinite(video.duration)
+    ? Math.max(0.1, video.duration - video.currentTime)
+    : duration;
+  const recordMs = Math.max(200, Math.min(duration, remainingSeconds) * 1000);
+  await Promise.race([wait(recordMs), once(video, "ended")]);
+  recorder.stop();
+  video.pause();
+  cancelAnimationFrame(frame);
+  await stopped;
+  return {
+    blob: new Blob(chunks, { type: "video/webm" }),
+    name: `${baseName(file.name)}-small.webm`,
   };
 }
 
@@ -1156,6 +1295,9 @@ function mimeForPreset(id: Operation) {
   if (id === "clip-mp4") {
     return "video/mp4";
   }
+  if (id === "video-webm") {
+    return "video/webm";
+  }
   if (id === "poster-png") {
     return "image/png";
   }
@@ -1198,6 +1340,36 @@ function playgroundHeaders() {
 
 function hasBackend() {
   return playgroundToken.length > 0;
+}
+
+function formatSeconds(value: number) {
+  return String(Math.round(value * 1000) / 1000);
+}
+
+function videoCrf(quality: string) {
+  if (quality === "high") {
+    return "24";
+  }
+  if (quality === "small") {
+    return "38";
+  }
+  return "31";
+}
+
+function videoBitrate(width: number, quality: string) {
+  let base = 800_000;
+  if (width >= 1280) {
+    base = 2_400_000;
+  } else if (width >= 854) {
+    base = 1_300_000;
+  }
+  if (quality === "high") {
+    return Math.round(base * 1.5);
+  }
+  if (quality === "small") {
+    return Math.round(base * 0.55);
+  }
+  return base;
 }
 
 function formatBytes(bytes: number) {

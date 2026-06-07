@@ -15,6 +15,7 @@
 - Added MP4/MOV muxer support for lossless stream-copy clips with faststart metadata.
 - Added local one-page media playground with source preview, preset builder, generated FFmpeg args, inline output preview, and browser save/download flow.
 - Added public `ffmpeg.sh` workbench root with editable FFmpeg command text, GitHub and docs actions, sample loading, and browser-side preview fallbacks.
+- Added workbench video downscale controls with width and quality presets, selectable MP3 command setup, and source-video seek syncing for poster-frame selection.
 - Added Chrome-driven playground E2E smoke test that loads the sample video, renders an MP4 clip, and writes a screenshot artifact.
 - Added GitHub Pages documentation source, static site builder, `ffmpeg.sh` CNAME, feature docs, and README playground screenshot.
 - Added enabled codecs, demuxers, muxers, filters, protocols, and external libraries tuned for a small local media toolchain.

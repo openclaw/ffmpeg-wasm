@@ -144,6 +144,28 @@ try {
         "document.querySelector('[data-testid=status-text]')?.textContent.trim() === 'Ready'",
         180_000,
       );
+      await waitFor(cdp, "!document.querySelector('[data-testid=preset-audio-mp3]')?.disabled");
+      await runtimeEvaluate(
+        cdp,
+        `(async () => {
+          const video = document.querySelector('#sourceViewer video');
+          if (!video) return false;
+          const seeked = new Promise((resolve) => video.addEventListener('seeked', resolve, { once: true }));
+          video.currentTime = 2;
+          await seeked;
+          return true;
+        })()`,
+      );
+      await waitFor(
+        cdp,
+        "document.querySelector('#parameterTitle')?.textContent === 'Poster frame' && document.querySelector('#frameInput')?.value === '2'",
+      );
+      await clickSelector(cdp, "[data-testid=preset-video-webm]");
+      await waitFor(
+        cdp,
+        "!document.querySelector('.video-quality-field')?.classList.contains('hidden') && document.querySelector('[data-testid=command-preview]')?.value.includes('scale=1280:-2')",
+      );
+      await clickSelector(cdp, "[data-testid=preset-clip-mp4]");
       await cdp.send("Runtime.evaluate", { expression: "delete globalThis.__lastRender" });
       await clickSelector(cdp, "[data-testid=render-button]");
       await waitFor(cdp, "!!globalThis.__lastRender", 120_000);

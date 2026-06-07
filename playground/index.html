@@ -149,13 +149,22 @@
               <span>Frame</span>
               <input id="frameInput" type="number" min="0" step="0.1" value="1" />
             </label>
-            <label class="field frame-field">
+            <label class="field size-field">
               <span>Width</span>
               <select id="widthSelect">
-                <option value="640">640</option>
-                <option value="960">960</option>
-                <option value="1280" selected>1280</option>
-                <option value="1920">1920</option>
+                <option value="426">426 / 240p</option>
+                <option value="640">640 / 360p</option>
+                <option value="854">854 / 480p</option>
+                <option value="1280" selected>1280 / 720p</option>
+                <option value="1920">1920 / 1080p</option>
+              </select>
+            </label>
+            <label class="field video-quality-field">
+              <span>Quality</span>
+              <select id="qualitySelect">
+                <option value="small">Small</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="high">High</option>
               </select>
             </label>
             <label class="field audio-field">
