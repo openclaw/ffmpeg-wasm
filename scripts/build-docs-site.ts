@@ -51,10 +51,10 @@ for (const page of pages) {
 }
 
 copyAssets();
-writeFileSync(
-  resolve(outDir, "CNAME"),
-  `${readFileSync(resolve(docsDir, "CNAME"), "utf8").trim()}\n`,
-);
+const cnamePath = resolve(docsDir, "CNAME");
+if (existsSync(cnamePath)) {
+  writeFileSync(resolve(outDir, "CNAME"), `${readFileSync(cnamePath, "utf8").trim()}\n`);
+}
 writeFileSync(resolve(outDir, ".nojekyll"), "");
 writeFileSync(resolve(outDir, "llms.txt"), llmsText(), "utf8");
 console.log(`built docs site: ${relative(root, outDir)}`);
