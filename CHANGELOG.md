@@ -12,6 +12,10 @@
 - Added runtime options for custom `distDir`, `cwd`, `env`, `stdin`, `stdinMode`, and `timeoutMs`.
 - Added automatic `-nostdin` handling for FFmpeg while preserving explicit stdin pipe workflows.
 - Added media support for inspection, audio extraction, thumbnails, rawvideo pipe output, stdin/stdout pipe I/O, and segmentation.
+- Added MP4/MOV muxer support for lossless stream-copy clips with faststart metadata.
+- Added local one-page media playground with source preview, preset builder, generated FFmpeg args, inline output preview, and browser save/download flow.
+- Added Chrome-driven playground E2E smoke test that loads the sample video, renders an MP4 clip, and writes a screenshot artifact.
+- Added GitHub Pages documentation source, static site builder, `ffmpeg.sh` CNAME, feature docs, and README playground screenshot.
 - Added enabled codecs, demuxers, muxers, filters, protocols, and external libraries tuned for a small local media toolchain.
 - Added generated license copying so FFmpeg license files ship next to generated wasm assets in `dist/`.
 - Added README guidance for the MIT wrapper code and LGPL generated FFmpeg assets.

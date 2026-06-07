@@ -2,7 +2,7 @@
   "name": "@steipete/ffmpeg-wasm-local",
   "version": "0.0.0",
   "private": true,
-  "description": "Local lightweight FFmpeg/FFprobe WebAssembly build for summarize.",
+  "description": "Local lightweight FFmpeg/FFprobe WebAssembly build for browser and Node media workflows.",
   "license": "MIT",
   "bin": {
     "ffmpeg-wasm": "./lib/src/cli.js",
@@ -17,12 +17,16 @@
   },
   "scripts": {
     "build": "pnpm compile && node lib/scripts/build.js",
-    "check": "pnpm compile && pnpm lint && pnpm format:check",
+    "check": "pnpm compile && pnpm lint && pnpm docs:build:compiled && pnpm format:check",
     "clean": "rimraf dist lib .cache/build",
-    "compile": "tsgo -p tsconfig.json && chmod +x lib/src/cli.js lib/src/ffprobe-cli.js lib/src/run-generated.js lib/scripts/build.js lib/scripts/verify.js",
+    "compile": "tsgo -p tsconfig.json && chmod +x lib/src/cli.js lib/src/ffprobe-cli.js lib/src/run-generated.js lib/scripts/build.js lib/scripts/build-docs-site.js lib/scripts/playground-e2e.js lib/scripts/playground-server.js lib/scripts/verify.js",
+    "docs:build": "pnpm compile && pnpm docs:build:compiled",
+    "docs:build:compiled": "node lib/scripts/build-docs-site.js",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --tsconfig tsconfig.json --deny-warnings .",
+    "playground": "pnpm compile && node lib/scripts/playground-server.js",
+    "playground:e2e": "pnpm compile && node lib/scripts/playground-e2e.js",
     "test:e2e": "pnpm build && pnpm verify",
     "verify": "pnpm compile && node lib/scripts/verify.js"
   },

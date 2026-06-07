@@ -75,5 +75,5 @@
     "reportUnusedDisableDirectives": "error",
     "typeAware": true
   },
-  "ignorePatterns": ["dist/**", "lib/**", ".cache/**", "node_modules/**"]
+  "ignorePatterns": ["dist/**", "lib/**", ".cache/**", "node_modules/**", "playground/app.js"]
 }

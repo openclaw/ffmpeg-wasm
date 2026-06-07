@@ -6,6 +6,8 @@ Lightweight FFmpeg and FFprobe for Node, built as modern WebAssembly for local m
 
 This repository is intentionally small in scope: one reproducible Emscripten build, one TypeScript wrapper, and enough codecs/protocols for media inspection, audio extraction, thumbnails, pipe I/O, and segmentation.
 
+![Media Bench playground](docs/assets/media-bench.png)
+
 ## Why
 
 Many media workflows need predictable FFmpeg and FFprobe behavior without carrying a full native FFmpeg bundle. This package builds a narrow LGPL FFmpeg wasm core and exposes it through:
@@ -59,6 +61,8 @@ Enabled demuxers:
 Enabled muxers:
 
 - `image2`
+- `mov`
+- `mp4`
 - `mp3`
 - `null`
 - `rawvideo`
@@ -130,12 +134,21 @@ brew install autoconf automake ffmpeg libtool nasm pkg-config yasm
 
 ```sh
 pnpm build
+pnpm docs:build
+pnpm playground
+pnpm playground:e2e
 pnpm verify
 pnpm test:e2e
 pnpm check
 ```
 
 `pnpm build` compiles TypeScript, fetches the configured FFmpeg/LAME refs into `.cache/`, builds static LAME, builds FFmpeg/FFprobe wasm, and writes generated assets to `dist/`.
+
+`pnpm docs:build` builds the GitHub Pages site from `docs/*.md` into `dist/docs-site`.
+
+`pnpm playground` starts a local one-page media bench at `http://127.0.0.1:4173`. It lets you load a video, choose a supported preset, inspect the generated FFmpeg args, render through the wasm wrapper, preview the output inline, and save via the browser file picker or download fallback.
+
+`pnpm playground:e2e` starts the playground on a temporary port, launches Chrome through DevTools, loads the sample video, renders an MP4 clip, and writes `.tmp/playground-e2e.png` for visual proof.
 
 `pnpm verify` creates a tiny native test video, then exercises FFprobe text and JSON output, WAV/MP3 extraction, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, segmentation, cwd/dist overrides, API validation failures, and CLI success/failure paths.
 
@@ -152,6 +165,7 @@ node lib/src/ffprobe-cli.js -v error -show_entries format=duration -of default=n
 node lib/src/cli.js -hide_banner -loglevel error -i input.mp4 -vn -ac 1 -ar 16000 audio.wav
 node lib/src/ffprobe-cli.js -v error -show_format input.mp4
 node lib/src/cli.js -hide_banner -i input.mp4 -frames:v 1 frame.png
+node lib/src/cli.js -hide_banner -ss 0 -i input.mp4 -t 5 -map 0:v:0 -map 0:a? -c copy -movflags +faststart clip.mp4
 ```
 
 The package also declares `ffmpeg-wasm` and `ffprobe-wasm` bin entries for downstream package-manager linking.
@@ -205,7 +219,7 @@ Both APIs accept:
 
 `ffmpeg` receives `-nostdin` automatically unless the caller already supplied it. Explicit `-i -` stdin input still works through the wrapper.
 
-## Summarize Wiring
+## Downstream Wiring
 
 Build once:
 
@@ -213,12 +227,12 @@ Build once:
 pnpm build
 ```
 
-Then point Summarize at the compiled wrappers:
+Then point a downstream tool at the compiled wrappers:
 
 ```sh
 FFMPEG_PATH="$PWD/lib/src/cli.js" \
 FFPROBE_PATH="$PWD/lib/src/ffprobe-cli.js" \
-summarize ...
+your-tool ...
 ```
 
 For direct package usage, import the TypeScript API and keep `dist/` next to the compiled `lib/` tree.
@@ -235,7 +249,11 @@ To keep the binary small, only add codecs, demuxers, muxers, filters, or protoco
 
 Useful places:
 
+- `playground/`: one-page local editor assets.
+- `docs/`: GitHub Pages source docs and screenshot assets.
 - `scripts/build.ts`: configure flags and Emscripten linker flags.
+- `scripts/build-docs-site.ts`: static docs site builder.
+- `scripts/playground-server.ts`: local editor server and render endpoints.
 - `scripts/verify.ts`: behavioral coverage for the generated wasm.
 - `.oxlintrc.json`: strict lint policy.
 
@@ -244,6 +262,7 @@ Useful places:
 GitHub Actions runs two jobs:
 
 - TypeScript, lint, and format on Node 24.
+- Static docs site build.
 - Full live wasm E2E with Emscripten, build caching, and `dist/` artifact upload.
 
 CI intentionally builds from source instead of trusting checked-in wasm output. `dist/` is ignored and regenerated.

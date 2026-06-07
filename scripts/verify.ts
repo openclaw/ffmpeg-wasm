@@ -13,6 +13,7 @@ try {
   const input = join(work, "input.mp4");
   const wav = join(work, "audio.wav");
   const mp3 = join(work, "audio.mp3");
+  const clip = join(work, "clip.mp4");
   const png = join(work, "frame.png");
   const raw = join(work, "hash.raw");
   const relativeCwd = join(work, "relative-cwd");
@@ -80,6 +81,7 @@ try {
       mp3,
     ]),
   );
+  await step("mp4 stream-copy clip", () => okMp4Clip(input, clip));
   await step("relative cwd output", () => okRelativeCwdOutput(input, relativeCwd, relativeWav));
   await step("API wav stdin pipe", () => okWavStdin(wav));
   await step("exec wav stdin pipe", () => okExecWavStdin(wav));
@@ -182,6 +184,7 @@ try {
 
   assertFile(wav, 1024, "wav transcode");
   assertFile(mp3, 1024, "mp3 transcode");
+  assertFile(clip, 1024, "mp4 stream-copy clip");
   assertFile(join(relativeCwd, relativeWav), 1024, "relative cwd transcode");
   assertFile(png, 1024, "png frame");
   assertFile(raw, 1024, "raw hash frame");
@@ -291,6 +294,30 @@ async function okFfmpeg(args: string[]) {
   if (result.exitCode !== 0) {
     fail(`ffmpeg ${args.join(" ")}`, result);
   }
+}
+
+async function okMp4Clip(input: string, output: string) {
+  await okFfmpeg([
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-ss",
+    "0.2",
+    "-i",
+    input,
+    "-t",
+    "1",
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a?",
+    "-c",
+    "copy",
+    "-movflags",
+    "+faststart",
+    output,
+  ]);
+  await okProbe(output);
 }
 
 async function okRelativeCwdOutput(input: string, cwd: string, output: string) {

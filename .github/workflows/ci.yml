@@ -101,6 +101,9 @@ jobs:
       - name: Live E2E
         run: pnpm test:e2e
 
+      - name: Playground E2E
+        run: pnpm playground:e2e
+
       - name: Upload dist
         uses: actions/upload-artifact@v4
         with:
