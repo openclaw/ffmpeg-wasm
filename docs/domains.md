@@ -23,4 +23,5 @@ DNS is hosted in Cloudflare:
 | `www.ffmpeg.sh`  | `CNAME` | `openclaw.github.io`                                                                       | DNS only |
 | `docs.ffmpeg.sh` | `A`     | `192.0.2.1`                                                                                | Proxied  |
 
-Cloudflare redirects `docs.ffmpeg.sh/*` to `https://ffmpeg.sh/docs/$1`.
+Cloudflare redirects `docs.ffmpeg.sh/docs/*` to `https://ffmpeg.sh/docs/$1`, then
+redirects `docs.ffmpeg.sh/*` to `https://ffmpeg.sh/docs/$1`.
