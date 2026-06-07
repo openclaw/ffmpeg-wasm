@@ -7,7 +7,11 @@ interface EmscriptenExitStatus {
   status?: number;
 }
 
-const [, , tool, distDir, ...args] = process.argv;
+type EmscriptenModuleFactory = (options: Record<string, unknown>) => Promise<unknown>;
+
+const tool = process.argv[2];
+const distDir = process.argv[3];
+const args = process.argv.slice(4);
 if (!tool || !distDir) {
   process.stderr.write("usage: run-generated <ffmpeg|ffprobe> <dist-dir> [...args]\n");
   process.exit(64);
@@ -21,11 +25,11 @@ const exited = new Promise<void>((resolvePromise) => {
 
 try {
   const jsPath = resolve(distDir, `${tool}.js`);
-  const imported = (await import(pathToFileURL(jsPath).href)) as {
-    default?: (options: Record<string, unknown>) => Promise<unknown>;
-  };
-  const createModule = imported.default;
-  if (typeof createModule !== "function") throw new Error(`Invalid Emscripten module: ${jsPath}`);
+  const imported: unknown = await import(pathToFileURL(jsPath).href);
+  const createModule = getDefaultFactory(imported);
+  if (!createModule) {
+    throw new Error(`Invalid Emscripten module: ${jsPath}`);
+  }
 
   const module = createModule({
     arguments: args,
@@ -43,7 +47,7 @@ try {
     exited,
     module.then(
       () => new Promise<never>(() => {}),
-      (error: EmscriptenExitStatus) => {
+      (error: unknown) => {
         if (isExitStatus(error)) {
           exitCode =
             typeof error.status === "number" ? error.status : (parseExitStatus(error) ?? exitCode);
@@ -56,15 +60,45 @@ try {
   ]);
   process.exit(exitCode);
 } catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
+  process.stderr.write(`${formatError(error)}\n`);
   process.exit(1);
 }
 
-function isExitStatus(error: EmscriptenExitStatus) {
-  return error?.name === "ExitStatus" || String(error).startsWith("Program terminated with exit(");
+function getDefaultFactory(value: unknown): EmscriptenModuleFactory | undefined {
+  if (value === null || value === undefined || typeof value !== "object" || !("default" in value)) {
+    return undefined;
+  }
+  const maybeFactory: unknown = Reflect.get(value, "default");
+  return isModuleFactory(maybeFactory) ? maybeFactory : undefined;
+}
+
+function isModuleFactory(value: unknown): value is EmscriptenModuleFactory {
+  return typeof value === "function";
+}
+
+function isExitStatus(error: unknown): error is EmscriptenExitStatus {
+  const text = formatError(error);
+  return (
+    (typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      error.name === "ExitStatus") ||
+    text.startsWith("Program terminated with exit(")
+  );
 }
 
 function parseExitStatus(error: EmscriptenExitStatus) {
-  const match = String(error).match(/exit\((\d+)\)/);
-  return match ? Number(match[1]) : undefined;
+  const match = /exit\((?<status>\d+)\)/u.exec(formatError(error));
+  const status = match?.groups?.status;
+  return status === undefined ? undefined : Number(status);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return JSON.stringify(error);
 }

@@ -2,10 +2,9 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { availableParallelism } from "node:os";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const root = resolve(import.meta.dirname, "..", "..");
 const cache = resolve(root, ".cache");
 const srcDir = resolve(cache, "FFmpeg");
 const lameDir = resolve(cache, "lame");
@@ -76,7 +75,9 @@ function run(cmd: string, args: string[], options: RunOptions = {}) {
     stdio: "inherit",
     env: { ...process.env, ...options.env },
   });
-  if (result.status !== 0 && !options.allowFailure) process.exit(result.status ?? 1);
+  if (result.status !== 0 && options.allowFailure !== true) {
+    process.exit(result.status ?? 1);
+  }
 }
 
 mkdirSync(cache, { recursive: true });
@@ -133,7 +134,9 @@ function parallelJobs() {
 }
 
 function ensureCheckout(dir: string, repo: string, ref: string) {
-  if (!existsSync(dir)) run("git", ["clone", "--filter=blob:none", "--no-checkout", repo, dir]);
+  if (!existsSync(dir)) {
+    run("git", ["clone", "--filter=blob:none", "--no-checkout", repo, dir]);
+  }
   run("git", ["fetch", "--depth", "1", "origin", ref], { cwd: dir });
   run("git", ["checkout", "--force", "--detach", "FETCH_HEAD"], { cwd: dir });
 }

@@ -1,9 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = import.meta.dirname;
 const root = resolve(here, "..", "..");
 const defaultDist = resolve(root, "dist");
 const runner = resolve(here, "run-generated.js");
@@ -27,44 +26,56 @@ export interface RunResult {
   stderrText: string;
 }
 
-export async function runFfmpeg(args: string[], options: RunOptions = {}) {
+export function runFfmpeg(args: string[], options: RunOptions = {}): Promise<RunResult> {
   return runTool("ffmpeg", args, options);
 }
 
-export async function runFfprobe(args: string[], options: RunOptions = {}) {
+export function runFfprobe(args: string[], options: RunOptions = {}): Promise<RunResult> {
   return runTool("ffprobe", args, options);
 }
 
-export async function execFfmpeg(args: string[], options: RunOptions = {}) {
+export function execFfmpeg(args: string[], options: RunOptions = {}): Promise<number> {
   return execTool("ffmpeg", args, options);
 }
 
-export async function execFfprobe(args: string[], options: RunOptions = {}) {
+export function execFfprobe(args: string[], options: RunOptions = {}): Promise<number> {
   return execTool("ffprobe", args, options);
 }
 
-export async function runTool(tool: Tool, args: string[], options: RunOptions = {}) {
-  if (!Array.isArray(args)) throw new TypeError("args must be an array");
-  const distDir = resolve(options.distDir ?? defaultDist);
-  const jsPath = resolve(distDir, `${tool}.js`);
-  const wasmPath = resolve(distDir, `${tool}_g.wasm`);
-  if (!existsSync(jsPath) || !existsSync(wasmPath)) {
-    throw new Error(`Missing ${tool} wasm assets in ${distDir}; run pnpm build.`);
-  }
+export function runTool(tool: Tool, args: string[], options: RunOptions = {}): Promise<RunResult> {
+  try {
+    if (!Array.isArray(args)) {
+      throw new TypeError("args must be an array");
+    }
+    const distDir = resolve(options.distDir ?? defaultDist);
+    const jsPath = resolve(distDir, `${tool}.js`);
+    const wasmPath = resolve(distDir, `${tool}_g.wasm`);
+    if (!existsSync(jsPath) || !existsSync(wasmPath)) {
+      throw new Error(`Missing ${tool} wasm assets in ${distDir}; run pnpm build.`);
+    }
 
-  return spawnTool(tool, distDir, normalizeArgs(tool, args), options);
+    return spawnTool(tool, distDir, normalizeArgs(tool, args), options);
+  } catch (error) {
+    return Promise.reject(toError(error));
+  }
 }
 
-export async function execTool(tool: Tool, args: string[], options: RunOptions = {}) {
-  if (!Array.isArray(args)) throw new TypeError("args must be an array");
-  const distDir = resolve(options.distDir ?? defaultDist);
-  const jsPath = resolve(distDir, `${tool}.js`);
-  const wasmPath = resolve(distDir, `${tool}_g.wasm`);
-  if (!existsSync(jsPath) || !existsSync(wasmPath)) {
-    throw new Error(`Missing ${tool} wasm assets in ${distDir}; run pnpm build.`);
-  }
+export function execTool(tool: Tool, args: string[], options: RunOptions = {}): Promise<number> {
+  try {
+    if (!Array.isArray(args)) {
+      throw new TypeError("args must be an array");
+    }
+    const distDir = resolve(options.distDir ?? defaultDist);
+    const jsPath = resolve(distDir, `${tool}.js`);
+    const wasmPath = resolve(distDir, `${tool}_g.wasm`);
+    if (!existsSync(jsPath) || !existsSync(wasmPath)) {
+      throw new Error(`Missing ${tool} wasm assets in ${distDir}; run pnpm build.`);
+    }
 
-  return spawnToolStreaming(tool, distDir, normalizeArgs(tool, args), options);
+    return spawnToolStreaming(tool, distDir, normalizeArgs(tool, args), options);
+  } catch (error) {
+    return Promise.reject(toError(error));
+  }
 }
 
 function spawnTool(
@@ -95,15 +106,25 @@ function spawnTool(
             child.kill("SIGTERM");
           }, options.timeoutMs);
 
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
-    if (hasStdin) child.stdin?.end(options.stdin);
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout.push(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr.push(chunk);
+    });
+    if (hasStdin) {
+      child.stdin?.end(options.stdin);
+    }
     child.on("error", (error) => {
-      if (timeout) clearTimeout(timeout);
+      if (timeout) {
+        clearTimeout(timeout);
+      }
       reject(error);
     });
     child.on("close", (code, signal) => {
-      if (timeout) clearTimeout(timeout);
+      if (timeout) {
+        clearTimeout(timeout);
+      }
       if (timedOut) {
         reject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
         return;
@@ -144,13 +165,19 @@ function spawnToolStreaming(
 
     child.on("error", (error) => {
       cleanupSignals();
-      if (timeout) clearTimeout(timeout);
+      if (timeout) {
+        clearTimeout(timeout);
+      }
       reject(error);
     });
-    if (hasStdin) child.stdin?.end(options.stdin);
+    if (hasStdin) {
+      child.stdin?.end(options.stdin);
+    }
     child.on("close", (code, signal) => {
       cleanupSignals();
-      if (timeout) clearTimeout(timeout);
+      if (timeout) {
+        clearTimeout(timeout);
+      }
       if (timedOut) {
         reject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
         return;
@@ -168,28 +195,42 @@ function forwardProcessSignals(child: ChildProcess) {
       forceExit ??= setTimeout(() => {
         child.kill("SIGKILL");
         process.exit(128 + signalNumber(signal));
-      }, 5_000);
+      }, 5000);
     };
     process.once(signal, listener);
     return () => {
-      if (forceExit) clearTimeout(forceExit);
+      if (forceExit) {
+        clearTimeout(forceExit);
+      }
       process.off(signal, listener);
     };
   });
   return () => {
-    for (const cleanup of listeners) cleanup();
+    for (const cleanup of listeners) {
+      cleanup();
+    }
   };
 }
 
 const forwardedSignals = ["SIGHUP", "SIGINT", "SIGTERM"] as const;
 
 function signalNumber(signal: (typeof forwardedSignals)[number]) {
-  if (signal === "SIGHUP") return 1;
-  if (signal === "SIGINT") return 2;
+  if (signal === "SIGHUP") {
+    return 1;
+  }
+  if (signal === "SIGINT") {
+    return 2;
+  }
   return 15;
 }
 
-function normalizeArgs(tool: Tool, args: string[]) {
-  if (tool !== "ffmpeg" || args.includes("-nostdin")) return args;
+function normalizeArgs(tool: Tool, args: string[]): string[] {
+  if (tool !== "ffmpeg" || args.includes("-nostdin")) {
+    return args;
+  }
   return ["-nostdin", ...args];
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }
