@@ -36,3 +36,5 @@ Then open `http://127.0.0.1:4173`.
 ## Local Safety
 
 The playground server binds to `127.0.0.1` and protects render APIs with a per-server request token embedded into the served page. Cross-origin pages cannot trigger uploads or FFmpeg work without that token.
+
+The browser client is written in TypeScript and compiled by `pnpm compile`, so `tsgo`, `oxlint`, and `oxfmt` cover the workbench code.

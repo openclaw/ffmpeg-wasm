@@ -17,6 +17,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { runFfmpeg, runFfprobe } from "../src/index.js";
 
 const root = resolve(import.meta.dirname, "..", "..");
+const compiledPlaygroundDir = resolve(root, "lib", "playground");
 const playgroundDir = resolve(root, "playground");
 const scratchRoot = resolve(root, ".tmp", "playground");
 const sampleVideoPath = resolve(scratchRoot, "sample.mp4");
@@ -61,6 +62,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
   }
   if (request.method === "GET" && url.pathname === "/app.js") {
     await sendStatic(response, "app.js", "text/javascript; charset=utf-8");
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/app.js.map") {
+    await sendStatic(response, "app.js.map", "application/json; charset=utf-8");
     return;
   }
   if (request.method === "GET" && url.pathname === "/styles.css") {
@@ -349,7 +354,8 @@ async function writeRequestBody(request: IncomingMessage, outputPath: string) {
 }
 
 async function sendStatic(response: ServerResponse, fileName: string, contentType: string) {
-  await sendFile(response, resolve(playgroundDir, fileName), { "Content-Type": contentType });
+  const directory = fileName.startsWith("app.js") ? compiledPlaygroundDir : playgroundDir;
+  await sendFile(response, resolve(directory, fileName), { "Content-Type": contentType });
 }
 
 async function sendFile(

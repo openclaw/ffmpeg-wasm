@@ -22,6 +22,7 @@
 - Added README guidance for the MIT wrapper code and LGPL generated FFmpeg assets.
 - Added README usage docs for build prerequisites, CLI commands, TypeScript APIs, package linking, build tuning, and downstream wrapper wiring.
 - Added strict TypeScript project setup using `tsgo`, `oxlint`, and `oxfmt`.
+- Added TypeScript workbench client compilation so browser code is covered by `tsgo`, `oxlint`, and `oxfmt`.
 - Added strict oxlint policy with type-aware rules and warning denial.
 - Added live verification harness covering FFprobe text and JSON output, WAV and MP3 extraction, stdin pipes, stdout pipes, PNG frame output, rawvideo byte equality, segmentation, cwd and dist overrides, API validation failures, and CLI success and failure paths.
 - Added `pnpm test:e2e` to rebuild wasm assets from source and run the live verifier.

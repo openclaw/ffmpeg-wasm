@@ -3,7 +3,7 @@
     "target": "ES2024",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2024"],
+    "lib": ["ES2024", "DOM"],
     "types": ["node"],
     "rootDir": ".",
     "outDir": "lib",
@@ -13,5 +13,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "playground/**/*.ts"]
 }

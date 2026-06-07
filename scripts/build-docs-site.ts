@@ -13,6 +13,7 @@ import { basename, dirname, relative, resolve, sep } from "node:path";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const docsDir = resolve(root, "docs");
+const compiledPlaygroundDir = resolve(root, "lib", "playground");
 const outDir = resolve(root, "dist", "docs-site");
 const playgroundDir = resolve(root, "playground");
 const repoBase = "https://github.com/openclaw/ffmpeg-wasm";
@@ -347,7 +348,8 @@ function copyWorkbench() {
     .replace('href="/docs/"', 'href="docs/"')
     .replace('src="/app.js"', 'src="app.js"');
   writeFileSync(resolve(outDir, "index.html"), index, "utf8");
-  copyFileSync(resolve(playgroundDir, "app.js"), resolve(outDir, "app.js"));
+  copyFileSync(resolve(compiledPlaygroundDir, "app.js"), resolve(outDir, "app.js"));
+  copyFileSync(resolve(compiledPlaygroundDir, "app.js.map"), resolve(outDir, "app.js.map"));
   copyFileSync(resolve(playgroundDir, "styles.css"), resolve(outDir, "styles.css"));
 }
 
