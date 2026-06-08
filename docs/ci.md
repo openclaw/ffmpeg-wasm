@@ -29,6 +29,6 @@ CI runs:
 - TypeScript, lint, format, and docs build.
 - Full wasm build and live verification.
 - Server and static browser workbench smoke tests with Chrome.
-- Cloudflare Pages deployment for `ffmpeg.sh`.
+- Cloudflare Pages deployment for `ffmpeg.sh` when `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` repository secrets are configured.
 
 The wasm job uploads `dist/` as an artifact for inspection.

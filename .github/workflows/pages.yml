@@ -30,6 +30,7 @@ jobs:
       EM_CACHE: ${{ github.workspace }}/.cache/emcache
       FFMPEG_VERSION: n8.1.1
       LAME_REF: master
+      HAS_CLOUDFLARE_DEPLOY: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' && secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -85,7 +86,12 @@ jobs:
         run: pnpm docs:build
 
       - name: Deploy to Cloudflare Pages
+        if: ${{ env.HAS_CLOUDFLARE_DEPLOY == 'true' }}
         run: pnpm exec wrangler pages deploy dist/docs-site --project-name ffmpeg-sh-site --branch main
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Skip deploy without Cloudflare credentials
+        if: ${{ env.HAS_CLOUDFLARE_DEPLOY != 'true' }}
+        run: echo "Cloudflare Pages deploy skipped; set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN repository secrets to enable deploys."
