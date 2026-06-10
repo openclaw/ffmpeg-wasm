@@ -24,6 +24,7 @@ The workbench is a ffmpac test surface. It does not use browser-native media enc
 - Probes duration, codec, audio, and size.
 - Shows FFmpeg args before rendering.
 - Renders through this package's wasm wrapper.
+- Shows render progress while ffmpac is working.
 - Runs without a server backend when hosted with cross-origin isolation headers.
 - Offers a smaller-video preset with output width and quality controls.
 - Previews video, image, audio, or raw output inline.

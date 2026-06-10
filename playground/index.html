@@ -210,6 +210,16 @@
             ></textarea>
           </div>
 
+          <div id="progressPanel" class="progress-panel" data-testid="progress-panel" hidden>
+            <div class="progress-head">
+              <span id="progressDetail" data-testid="progress-detail"></span>
+              <span id="progressValue" data-testid="progress-value">0%</span>
+            </div>
+            <div class="progress-track" aria-hidden="true">
+              <span id="progressBar" class="progress-bar"></span>
+            </div>
+          </div>
+
           <div class="action-row">
             <button
               id="renderButton"

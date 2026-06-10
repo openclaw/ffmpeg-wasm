@@ -37,6 +37,11 @@ interface RenderState {
   operation: string;
 }
 
+interface ProgressState {
+  detail: string;
+  value: string;
+}
+
 interface Point {
   x: number;
   y: number;
@@ -172,6 +177,9 @@ try {
       const videoState = await readState(cdp);
       if (videoState.lastRender.operation !== "video-mp4" || videoState.lastRender.bytes <= 1000) {
         throw new Error(`Unexpected video render result: ${JSON.stringify(videoState.lastRender)}`);
+      }
+      if (staticMode && videoState.lastProgress.value !== "100%") {
+        throw new Error(`Missing video progress state: ${JSON.stringify(videoState.lastProgress)}`);
       }
       if (!videoState.outputVideo || videoState.status !== "Rendered") {
         throw new Error(`Unexpected video UI state: ${JSON.stringify(videoState)}`);
@@ -434,6 +442,7 @@ async function readState(cdp: CdpClient) {
       outputMetrics: document.querySelector('[data-testid=output-metrics]').textContent,
       outputAudio: !!document.querySelector('[data-testid=output-viewer] audio'),
       outputVideo: !!document.querySelector('[data-testid=output-viewer] video'),
+      lastProgress: globalThis.__lastProgress,
       lastRender: globalThis.__lastRender
     })`,
   );
@@ -443,6 +452,7 @@ async function readState(cdp: CdpClient) {
   }
   const parsed = asRecord(parseJson(value));
   return {
+    lastProgress: asProgressState(parsed.lastProgress),
     lastRender: asRenderState(parsed.lastRender),
     outputAudio: parsed.outputAudio === true,
     outputTitle: asString(parsed.outputTitle),
@@ -612,6 +622,14 @@ function asRenderState(value: unknown): RenderState {
     bytes: asNumber(record.bytes),
     name: asString(record.name),
     operation: asString(record.operation),
+  };
+}
+
+function asProgressState(value: unknown): ProgressState {
+  const record = asRecord(value);
+  return {
+    detail: asString(record.detail),
+    value: asString(record.value),
   };
 }
 

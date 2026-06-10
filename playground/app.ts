@@ -44,6 +44,11 @@ interface LastRenderState {
   operation: Operation;
 }
 
+interface LastProgressState {
+  detail: string;
+  value: string;
+}
+
 interface WorkbenchState {
   commandEdited: boolean;
   file: File | null;
@@ -93,14 +98,36 @@ interface BrowserWorkerFailure {
   stderrText?: string;
 }
 
-type BrowserWorkerResponse = BrowserWorkerFailure | BrowserWorkerSuccess;
+interface BrowserWorkerProgress {
+  id: number;
+  progress: {
+    frame?: number;
+    outTimeSeconds?: number;
+    phase: "continue" | "end";
+    speed?: string;
+  };
+  type: "progress";
+}
+
+type BrowserWorkerResponse = BrowserWorkerFailure | BrowserWorkerProgress | BrowserWorkerSuccess;
+
+interface BrowserToolProgress {
+  frame?: number;
+  outTimeSeconds?: number;
+  phase: "continue" | "end";
+  speed?: string;
+}
 
 type BrowserGlobal = typeof globalThis & {
+  __lastProgress?: LastProgressState;
   __lastRender?: LastRenderState;
   showSaveFilePicker?: (options: BrowserSaveOptions) => Promise<BrowserFileHandle>;
 };
 
 const browserGlobal = globalThis as BrowserGlobal;
+
+const BROWSER_TOOL_ABSOLUTE_TIMEOUT_MS = 15 * 60_000;
+const BROWSER_TOOL_IDLE_TIMEOUT_MS = 180_000;
 
 const presets: Preset[] = [
   {
@@ -218,6 +245,10 @@ const elements = {
   parameterTitle: requireElement("#parameterTitle", HTMLElement),
   presetArgsButton: requireElement("#presetArgsButton", HTMLButtonElement),
   presetList: requireElement("#presetList", HTMLElement),
+  progressBar: requireElement("#progressBar", HTMLElement),
+  progressDetail: requireElement("#progressDetail", HTMLElement),
+  progressPanel: requireElement("#progressPanel", HTMLElement),
+  progressValue: requireElement("#progressValue", HTMLElement),
   qualitySelect: requireElement("#qualitySelect", HTMLSelectElement),
   renderButton: requireElement("#renderButton", HTMLButtonElement),
   renderSaveButton: requireElement("#renderSaveButton", HTMLButtonElement),
@@ -410,6 +441,7 @@ async function renderOutput(saveAfterRender: boolean) {
   }
 
   setStatus("Rendering", "busy");
+  showProgress("Preparing ffmpac", null);
   elements.renderButton.disabled = true;
   elements.renderSaveButton.disabled = true;
   try {
@@ -427,6 +459,7 @@ async function renderOutput(saveAfterRender: boolean) {
   } catch (error) {
     setStatus(errorMessage(error), "error");
   } finally {
+    hideProgress();
     elements.renderButton.disabled = false;
     elements.renderSaveButton.disabled = false;
   }
@@ -659,7 +692,13 @@ async function renderWithBrowserFfmpac(file: File): Promise<RenderOutput> {
   const outputName = backendOutputName();
   const outputPath = `/${outputName}`;
   const args = buildBackendArgs(inputPath, outputPath);
-  const result = await runBrowserTool("ffmpeg", { args, inputPath, outputPath, source: file });
+  const result = await runBrowserTool("ffmpeg", {
+    args: progressArgs(args),
+    inputPath,
+    onProgress: renderProgressHandler(progressDurationSeconds(operation, args)),
+    outputPath,
+    source: file,
+  });
   if (result.exitCode !== 0) {
     throw new Error(result.stderrText || "ffmpeg failed");
   }
@@ -675,24 +714,72 @@ async function renderWithBrowserFfmpac(file: File): Promise<RenderOutput> {
 
 async function runBrowserTool(
   tool: "ffmpeg" | "ffprobe",
-  options: { args: string[]; inputPath: string; outputPath?: string; source: File },
+  options: {
+    args: string[];
+    inputPath: string;
+    onProgress?: (progress: BrowserToolProgress) => void;
+    outputPath?: string;
+    source: File;
+  },
 ): Promise<BrowserToolResult> {
   const inputBuffer = await options.source.arrayBuffer();
   const worker = new Worker(new URL("ffmpac-worker.js", import.meta.url), { type: "module" });
   const id = crypto.getRandomValues(new Uint32Array(1))[0];
   try {
     return await new Promise<BrowserToolResult>((resolvePromise, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error("Timed out waiting for browser ffmpac"));
-      }, 180_000);
+      const timeouts: {
+        absolute?: ReturnType<typeof setTimeout>;
+        idle?: ReturnType<typeof setTimeout>;
+      } = {};
+      let settled = false;
+      const clearToolTimeouts = () => {
+        if (timeouts.idle !== undefined) {
+          clearTimeout(timeouts.idle);
+        }
+        if (timeouts.absolute !== undefined) {
+          clearTimeout(timeouts.absolute);
+        }
+      };
+      const rejectOnce = (error: Error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearToolTimeouts();
+        reject(error);
+      };
+      const resolveOnce = (result: BrowserToolResult) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearToolTimeouts();
+        resolvePromise(result);
+      };
+      const refreshIdleTimeout = () => {
+        if (timeouts.idle !== undefined) {
+          clearTimeout(timeouts.idle);
+        }
+        timeouts.idle = setTimeout(() => {
+          rejectOnce(new Error("Timed out waiting for browser ffmpac progress"));
+        }, BROWSER_TOOL_IDLE_TIMEOUT_MS);
+      };
+      refreshIdleTimeout();
+      timeouts.absolute = setTimeout(() => {
+        rejectOnce(new Error("Timed out running browser ffmpac"));
+      }, BROWSER_TOOL_ABSOLUTE_TIMEOUT_MS);
       worker.addEventListener("message", (event: MessageEvent<BrowserWorkerResponse>) => {
         const response = event.data;
         if (response.id !== id) {
           return;
         }
-        clearTimeout(timeout);
+        if (isProgressResponse(response)) {
+          refreshIdleTimeout();
+          options.onProgress?.(response.progress);
+          return;
+        }
         if (!response.ok) {
-          reject(
+          rejectOnce(
             new Error(
               response.stderrText !== undefined && response.stderrText.length > 0
                 ? response.stderrText
@@ -701,7 +788,7 @@ async function runBrowserTool(
           );
           return;
         }
-        resolvePromise({
+        resolveOnce({
           exitCode: response.exitCode,
           outputFile: response.outputFile,
           stderrText: response.stderrText,
@@ -709,8 +796,7 @@ async function runBrowserTool(
         });
       });
       worker.addEventListener("error", (event) => {
-        clearTimeout(timeout);
-        reject(new Error(event.message));
+        rejectOnce(new Error(event.message));
       });
       worker.postMessage(
         {
@@ -727,6 +813,91 @@ async function runBrowserTool(
   } finally {
     worker.terminate();
   }
+}
+
+function isProgressResponse(response: BrowserWorkerResponse): response is BrowserWorkerProgress {
+  return "type" in response && response.type === "progress";
+}
+
+function progressArgs(args: string[]) {
+  return ["-progress", "pipe:2", "-nostats", ...args];
+}
+
+function renderProgressHandler(durationSeconds: number | null) {
+  return (progress: BrowserToolProgress) => {
+    if (progress.phase === "end") {
+      showProgress("Finalizing output", 1);
+      setStatus("Rendering 100%", "busy");
+      return;
+    }
+    const ratio =
+      durationSeconds === null || progress.outTimeSeconds === undefined
+        ? null
+        : Math.min(Math.max(progress.outTimeSeconds / durationSeconds, 0), 0.99);
+    const detailParts: string[] = [];
+    if (progress.outTimeSeconds !== undefined) {
+      detailParts.push(`time ${formatDuration(progress.outTimeSeconds)}`);
+    }
+    if (progress.frame !== undefined) {
+      detailParts.push(`frame ${progress.frame}`);
+    }
+    if (progress.speed !== undefined && progress.speed.length > 0) {
+      detailParts.push(`speed ${progress.speed}`);
+    }
+    showProgress(detailParts.join(" · ") || "ffmpac is working", ratio);
+    if (ratio !== null) {
+      setStatus(`Rendering ${Math.round(ratio * 100)}%`, "busy");
+    }
+  };
+}
+
+function progressDurationSeconds(operation: Operation, args: string[]) {
+  if (operation === "clip-mp4" || operation === "video-mp4") {
+    return clippedDurationSeconds(args);
+  }
+  if (operation === "audio-mp3" || operation === "audio-wav") {
+    return sourceAudioDurationSeconds();
+  }
+  return null;
+}
+
+function clippedDurationSeconds(args: string[]) {
+  const requestedDuration = optionNumber(args, "-t");
+  const sourceDuration = sourceMediaDurationSeconds();
+  if (sourceDuration === null) {
+    return requestedDuration;
+  }
+  const start = optionNumber(args, "-ss") ?? 0;
+  const remainingDuration = Math.max(sourceDuration - start, 0);
+  if (remainingDuration === 0) {
+    return null;
+  }
+  if (requestedDuration === null) {
+    return remainingDuration;
+  }
+  return Math.min(requestedDuration, remainingDuration);
+}
+
+function optionNumber(args: string[], option: string) {
+  const index = args.indexOf(option);
+  if (index === -1) {
+    return null;
+  }
+  return positiveNumber(args[index + 1]);
+}
+
+function sourceAudioDurationSeconds() {
+  const audio = state.probe?.streams?.find((stream: ProbeStream) => stream.codec_type === "audio");
+  return positiveNumber(audio?.duration ?? state.probe?.format?.duration);
+}
+
+function sourceMediaDurationSeconds() {
+  return positiveNumber(state.probe?.format?.duration);
+}
+
+function positiveNumber(value: string | undefined) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function buildQuery() {
@@ -977,6 +1148,33 @@ function setStatus(text: string, mode: StatusMode) {
   elements.statusText.textContent = text;
   elements.statusPill.classList.toggle("busy", mode === "busy");
   elements.statusPill.classList.toggle("error", mode === "error");
+}
+
+function showProgress(detail: string, ratio: number | null) {
+  elements.progressPanel.hidden = false;
+  elements.progressDetail.textContent = detail;
+  if (ratio === null) {
+    elements.progressPanel.classList.add("indeterminate");
+    elements.progressBar.style.width = "42%";
+    elements.progressValue.textContent = "Working";
+    // oxlint-disable-next-line no-underscore-dangle -- Stable browser E2E test hook.
+    browserGlobal.__lastProgress = { detail, value: "Working" };
+    return;
+  }
+  const percent = Math.round(Math.min(Math.max(ratio, 0), 1) * 100);
+  elements.progressPanel.classList.remove("indeterminate");
+  elements.progressBar.style.width = `${percent}%`;
+  elements.progressValue.textContent = `${percent}%`;
+  // oxlint-disable-next-line no-underscore-dangle -- Stable browser E2E test hook.
+  browserGlobal.__lastProgress = { detail, value: `${percent}%` };
+}
+
+function hideProgress() {
+  elements.progressPanel.hidden = true;
+  elements.progressPanel.classList.remove("indeterminate");
+  elements.progressBar.style.width = "0%";
+  elements.progressValue.textContent = "0%";
+  elements.progressDetail.textContent = "";
 }
 
 function currentPreset(): Preset {

@@ -32,8 +32,19 @@ interface BrowserToolFailure {
   stderrText?: string;
 }
 
+interface BrowserToolProgress {
+  id: number;
+  progress: {
+    frame?: number;
+    outTimeSeconds?: number;
+    phase: "continue" | "end";
+    speed?: string;
+  };
+  type: "progress";
+}
+
 type BrowserToolFactory = (options: Record<string, unknown>) => Promise<BrowserToolModule>;
-type BrowserToolResponse = BrowserToolFailure | BrowserToolSuccess;
+type BrowserToolResponse = BrowserToolFailure | BrowserToolProgress | BrowserToolSuccess;
 type WorkerScope = typeof globalThis & {
   postMessage: (message: BrowserToolResponse, transfer?: Transferable[]) => void;
 };
@@ -48,6 +59,7 @@ globalThis.addEventListener("message", (event: MessageEvent<BrowserToolRequest>)
 async function runTool(request: BrowserToolRequest) {
   const stdout: string[] = [];
   const stderr: string[] = [];
+  const reportProgress = progressReporter(request.id);
   try {
     const factory = await browserToolFactory(request.tool);
     let exitCode: number | undefined;
@@ -63,7 +75,11 @@ async function runTool(request: BrowserToolRequest) {
         resolveExit(code);
       },
       print: (line: string) => stdout.push(line),
-      printErr: (line: string) => stderr.push(line),
+      printErr: (line: string) => {
+        if (!reportProgress(line)) {
+          stderr.push(line);
+        }
+      },
       preRun: (runtimeModule: BrowserToolModule) => {
         runtimeModule.FS.writeFile(request.inputPath, new Uint8Array(request.inputBuffer));
       },
@@ -84,6 +100,81 @@ async function runTool(request: BrowserToolRequest) {
       [],
     );
   }
+}
+
+function progressReporter(id: number) {
+  const progress: Record<string, string> = {};
+  return (line: string) => {
+    const match = /^(?<key>[a-z0-9_]+)=(?<value>.*)$/u.exec(line.trim());
+    if (match?.groups === undefined || !isProgressKey(match.groups.key)) {
+      return false;
+    }
+    progress[match.groups.key] = match.groups.value;
+    if (match.groups.key !== "progress") {
+      return true;
+    }
+    const outTimeSeconds = parseProgressTime(progress);
+    workerScope.postMessage(
+      {
+        id,
+        progress: {
+          frame: parseFiniteNumber(progress.frame),
+          ...(outTimeSeconds === null ? {} : { outTimeSeconds }),
+          phase: match.groups.value === "end" ? "end" : "continue",
+          speed: progress.speed,
+        },
+        type: "progress",
+      },
+      [],
+    );
+    return true;
+  };
+}
+
+function isProgressKey(key: string) {
+  return (
+    key === "bitrate" ||
+    key === "drop_frames" ||
+    key === "dup_frames" ||
+    key === "fps" ||
+    key === "frame" ||
+    key === "out_time" ||
+    key === "out_time_ms" ||
+    key === "out_time_us" ||
+    key === "progress" ||
+    key === "speed" ||
+    key === "total_size" ||
+    /^stream_\d+_\d+_q$/u.test(key)
+  );
+}
+
+function parseProgressTime(progress: Record<string, string>) {
+  const micros = parseFiniteNumber(progress.out_time_us);
+  if (micros !== undefined) {
+    return micros / 1_000_000;
+  }
+  const millis = parseFiniteNumber(progress.out_time_ms);
+  if (millis !== undefined) {
+    return millis / 1_000_000;
+  }
+  const clock = progress.out_time;
+  if (clock === undefined) {
+    return null;
+  }
+  const match = /^(?<hours>\d+):(?<minutes>\d{2}):(?<seconds>\d{2}(?:\.\d+)?)$/u.exec(clock);
+  if (match?.groups === undefined) {
+    return null;
+  }
+  return (
+    Number(match.groups.hours) * 3600 +
+    Number(match.groups.minutes) * 60 +
+    Number(match.groups.seconds)
+  );
+}
+
+function parseFiniteNumber(value: string | undefined) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function successResponse(
@@ -112,14 +203,7 @@ function browserToolExitCode(currentExitCode: number | undefined, exitPromise: P
   if (currentExitCode !== undefined) {
     return currentExitCode;
   }
-  return Promise.race([
-    exitPromise,
-    new Promise<number>((_resolvePromise, reject) => {
-      setTimeout(() => {
-        reject(new Error("Timed out waiting for browser ffmpac"));
-      }, 180_000);
-    }),
-  ]);
+  return exitPromise;
 }
 
 async function browserToolFactory(tool: "ffmpeg" | "ffprobe"): Promise<BrowserToolFactory> {

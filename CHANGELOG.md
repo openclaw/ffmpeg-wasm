@@ -17,6 +17,7 @@
 - Added public `ffmpeg.sh` workbench root with editable FFmpeg command text, GitHub and docs actions, sample loading, and inline output previews.
 - Added browser ffmpac runtime for the static workbench, using a dedicated worker so uploads, probing, MP4 renders, and MP3 renders run without a server backend.
 - Added ffmpac-backed workbench video downscale controls with width and quality presets, selectable MP3 rendering, and source-video seek syncing for poster-frame selection.
+- Added workbench render progress with browser ffmpac progress parsing, percentage updates, and an indeterminate working state for short jobs.
 - Added Chrome-driven playground E2E smoke test that loads the sample video, renders a smaller MP4 and MP3, and writes a screenshot artifact.
 - Added static browser workbench E2E coverage that blocks `/api/*` and verifies browser-only ffmpac MP4 and MP3 rendering.
 - Added GitHub Pages documentation source, static site builder, `ffmpeg.sh` CNAME, feature docs, and README playground screenshot.
