@@ -34,5 +34,6 @@
 - Added live verification harness covering FFprobe text and JSON output, WAV and MP3 extraction, stdin pipes, stdout pipes, PNG frame output, rawvideo byte equality, segmentation, cwd and dist overrides, API validation failures, and CLI success and failure paths.
 - Added `pnpm test:e2e` to rebuild wasm assets from source and run the live verifier.
 - Added GitHub Actions CI for quality checks and full live wasm E2E on Node 24 with Emscripten, build caching, and `dist` artifact upload.
+- Added CI conversion proof artifacts, explicit CLI MP4/MP3 transcoding, codec and dimension assertions, native executable auditing, separate server/static browser screenshots, and reliable browser-process teardown.
 - Added Cloudflare Pages deployment workflow so the static workbench ships with the COOP/COEP headers required by browser ffmpac.
 - Verified each generated Node or browser FFmpeg/FFprobe bundle at about 8.5 MB.

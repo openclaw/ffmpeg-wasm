@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,6 +18,7 @@ jobs:
   quality:
     name: TypeScript, lint, format
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -41,9 +43,12 @@ jobs:
   wasm:
     name: Build and verify wasm
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     env:
+      CI: "true"
       EM_CACHE: ${{ github.workspace }}/.cache/emcache
       FFMPEG_VERSION: n8.1.1
+      FFMPEG_WASM_VERIFY_OUTPUT_DIR: .tmp/verify-proof
       LAME_REF: master
       LIBVPX_REF: v1.16.0
     steps:
@@ -100,6 +105,14 @@ jobs:
       - name: Live E2E
         run: pnpm test:e2e
 
+      - name: Audit wasm distribution
+        run: |
+          set -euo pipefail
+          if find dist -type f -print0 | xargs -0 file | grep -E 'ELF|Mach-O|PE32|MS-DOS executable'; then
+            echo "::error::Native executable found in dist/"
+            exit 1
+          fi
+
       - name: Playground E2E
         run: pnpm playground:e2e
 
@@ -109,8 +122,23 @@ jobs:
       - name: Static browser ffmpac E2E
         run: PLAYGROUND_E2E_STATIC=1 pnpm playground:e2e
 
+      - name: Upload conversion proof
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ffmpeg-wasm-conversion-proof
+          path: |
+            .tmp/verify-proof
+            .tmp/playground-e2e-server.png
+            .tmp/playground-e2e-static.png
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload dist
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ffmpeg-wasm-dist
           path: dist
+          if-no-files-found: warn
+          retention-days: 14

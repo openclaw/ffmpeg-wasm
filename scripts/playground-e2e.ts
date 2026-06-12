@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { once } from "node:events";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest, type ServerResponse } from "node:http";
@@ -10,10 +11,11 @@ import { pipeline } from "node:stream/promises";
 const root = resolve(import.meta.dirname, "..", "..");
 const port = String(4174 + Math.floor(Math.random() * 1000));
 const baseUrl = `http://127.0.0.1:${port}`;
-const screenshotPath = resolve(root, ".tmp", "playground-e2e.png");
+const staticMode = process.env.PLAYGROUND_E2E_STATIC === "1";
+const mode = staticMode ? "static" : "server";
+const screenshotPath = resolve(root, ".tmp", `playground-e2e-${mode}.png`);
 await mkdir(dirname(screenshotPath), { recursive: true });
 const chromePath = process.env.CHROME_PATH ?? resolveChromePath();
-const staticMode = process.env.PLAYGROUND_E2E_STATIC === "1";
 
 interface CdpError {
   message: string;
@@ -201,7 +203,6 @@ try {
         format: "png",
       });
       await writeFile(screenshotPath, Buffer.from(asStringField(screenshot, "data"), "base64"));
-      const mode = staticMode ? "static" : "server";
       console.log(
         `playground e2e ok (${mode}, ${videoState.lastRender.name}, ${audioState.lastRender.name})`,
       );
@@ -210,13 +211,18 @@ try {
       await writeFailureState(cdp);
       throw error;
     } finally {
+      try {
+        await cdp.send("Browser.close");
+      } catch {
+        // Chrome may already be gone after a browser-side failure.
+      }
       cdp.close();
     }
   } finally {
-    stop(chrome);
+    await stop(chrome);
   }
 } finally {
-  stop(server);
+  await stop(server);
 }
 
 function startPlaygroundServer() {
@@ -593,13 +599,44 @@ async function jsonGet(url: string) {
   return value;
 }
 
-function stop(child: ChildProcessWithoutNullStreams | ReturnType<typeof createServer>) {
+async function stop(child: ChildProcessWithoutNullStreams | ReturnType<typeof createServer>) {
   if (!("killed" in child)) {
-    child.close();
+    await new Promise<void>((resolvePromise, reject) => {
+      child.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolvePromise();
+      });
+    });
     return;
   }
-  if (!child.killed) {
-    child.kill();
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+  child.kill("SIGTERM");
+  if (await waitForExit(child, 5000)) {
+    return;
+  }
+  child.kill("SIGKILL");
+  if (!(await waitForExit(child, 5000))) {
+    throw new Error(`Process ${String(child.pid)} did not exit`);
+  }
+}
+
+async function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return true;
+  }
+  try {
+    await once(child, "exit", { signal: AbortSignal.timeout(timeoutMs) });
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return false;
+    }
+    throw error;
   }
 }
 

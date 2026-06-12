@@ -34,4 +34,4 @@ pnpm verify
 pnpm playground:e2e
 ```
 
-`pnpm verify` exercises the wasm wrapper against generated media fixtures. `pnpm playground:e2e` launches Chrome, loads the local media playground, renders a smaller MP4 and MP3, and writes `.tmp/playground-e2e.png`.
+`pnpm verify` exercises the wasm wrapper against generated media fixtures. `pnpm playground:e2e` launches Chrome, loads the local media playground, renders a smaller MP4 and MP3, and writes `.tmp/playground-e2e-server.png`.

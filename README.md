@@ -157,9 +157,9 @@ pnpm check
 
 `pnpm playground` starts a local one-page media bench at `http://127.0.0.1:4173`. It lets you load a video, choose a supported preset, inspect the generated FFmpeg args, render through the wasm wrapper, preview the output inline, and save via the browser file picker or download fallback.
 
-`pnpm playground:e2e` starts the playground on a temporary port, launches Chrome through DevTools, loads the sample video, renders a smaller MP4 and an MP3, and writes `.tmp/playground-e2e.png` for visual proof. Set `PLAYGROUND_E2E_STATIC=1` to test the static `dist/docs-site` workbench with `/api/*` blocked and only browser ffmpac available.
+`pnpm playground:e2e` starts the playground on a temporary port, launches Chrome through DevTools, loads the sample video, renders a smaller MP4 and an MP3, and writes `.tmp/playground-e2e-server.png` for visual proof. Set `PLAYGROUND_E2E_STATIC=1` to test the static `dist/docs-site` workbench with `/api/*` blocked and only browser ffmpac available; that mode writes `.tmp/playground-e2e-static.png`.
 
-`pnpm verify` creates a tiny test video through the wasm build with external executable lookup disabled, then exercises FFprobe text and JSON output, WAV/MP3 extraction, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, segmentation, cwd/dist overrides, API validation failures, and CLI success/failure paths.
+`pnpm verify` creates a tiny test video through the wasm build with external executable lookup disabled, then exercises FFprobe text and JSON output, API and CLI MP4/MP3 conversions, codec and dimension assertions, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, segmentation, cwd/dist overrides, API validation failures, and CLI failure paths. Set `FFMPEG_WASM_VERIFY_OUTPUT_DIR` to retain the converted files and JSON manifest.
 
 `pnpm test:e2e` rebuilds the wasm assets from source, then runs the same live verifier against the generated FFmpeg/FFprobe wrappers.
 
@@ -272,6 +272,6 @@ GitHub Actions runs two jobs:
 
 - TypeScript, lint, and format on Node 24.
 - Static docs site build.
-- Full live wasm E2E with Emscripten, server and static browser workbench tests, build caching, and `dist/` artifact upload.
+- Full live wasm E2E with Emscripten, explicit API and CLI media conversions, codec/dimension assertions, native executable auditing, server and static browser workbench tests, build caching, and proof artifact uploads.
 
-CI intentionally builds from source instead of trusting checked-in wasm output. `dist/` is ignored and regenerated.
+CI intentionally builds from source instead of trusting checked-in wasm output. `dist/` is ignored and regenerated. The wasm job uploads `dist/`, converted media, a verification manifest, and both browser screenshots for inspection.
