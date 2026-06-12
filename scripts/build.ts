@@ -8,12 +8,17 @@ const root = resolve(import.meta.dirname, "..", "..");
 const cache = resolve(root, ".cache");
 const browserSrcDir = resolve(cache, "FFmpeg-browser");
 const lameDir = resolve(cache, "lame");
+const libvpxDir = resolve(cache, "libvpx");
 const nodeSrcDir = resolve(cache, "FFmpeg");
 const prefix = resolve(cache, "prefix");
 const dist = resolve(root, "dist");
 const browserDist = resolve(dist, "browser");
 const ffmpegTag = process.env.FFMPEG_VERSION ?? "n8.1.1";
 const lameRef = process.env.LAME_REF ?? "master";
+const libvpxRef = process.env.LIBVPX_REF ?? "v1.16.0";
+const jobs = Math.max(1, Math.min(8, availableParallelism()));
+const prefixInclude = resolve(prefix, "include");
+const prefixLib = resolve(prefix, "lib");
 
 const commonConfigureFlags = [
   "--target-os=none",
@@ -33,19 +38,22 @@ const commonConfigureFlags = [
   "--enable-ffprobe",
   "--disable-ffplay",
   "--enable-avcodec",
+  "--enable-avdevice",
   "--enable-avformat",
   "--enable-avfilter",
   "--enable-swresample",
   "--enable-swscale",
-  "--enable-decoder=h264,hevc,mpeg4,vp8,vp9,aac,mp3,flac,vorbis,opus,pcm_s16le,png,mjpeg",
+  "--enable-decoder=h264,hevc,mpeg4,vp8,vp9,aac,mp3,flac,vorbis,opus,pcm_s16le,png,mjpeg,wrapped_avframe",
   "--enable-parser=h264,hevc,mpeg4video,vp8,vp9,aac,mpegaudio,opus,vorbis,png,mjpeg",
   "--enable-demuxer=mov,matroska,mp3,wav,flac,ogg,aac,mpegts,hls,image2",
-  "--enable-muxer=null,rawvideo,image2,wav,segment,mp3,mov,mp4",
-  "--enable-encoder=mpeg4,png,rawvideo,wrapped_avframe,pcm_s16le,libmp3lame",
+  "--enable-indev=lavfi",
+  "--enable-muxer=null,rawvideo,image2,wav,segment,mp3,mov,mp4,webm",
+  "--enable-encoder=mpeg4,png,rawvideo,wrapped_avframe,pcm_s16le,libmp3lame,libvpx_vp8,opus",
   "--enable-protocol=file,data,pipe,fd",
-  "--enable-filter=scale,format,select,showinfo,signalstats,metadata,null,aresample,aformat",
+  "--enable-filter=scale,format,select,showinfo,signalstats,metadata,null,aresample,aformat,testsrc2,sine",
   "--enable-zlib",
   "--enable-libmp3lame",
+  "--enable-libvpx",
   "--cc=emcc",
   "--cxx=em++",
   "--ar=emar",
@@ -55,31 +63,19 @@ const commonConfigureFlags = [
   "--optflags=-Oz",
 ];
 
-const nodeConfigureFlags = [
+const ffmpegConfigureFlags = [
   ...commonConfigureFlags,
   "--enable-pthreads",
   "--disable-w32threads",
   "--disable-os2threads",
-  `--extra-cflags=-Oz -pthread -sUSE_ZLIB=1 -I${resolve(prefix, "include")}`,
-  `--extra-ldflags=-Oz -pthread -sUSE_ZLIB=1 -L${resolve(prefix, "lib")}`,
+  `--extra-cflags=-Oz -pthread -sUSE_ZLIB=1 -I${prefixInclude}`,
+  `--extra-ldflags=-Oz -pthread -sUSE_ZLIB=1 -L${prefixLib}`,
 ];
 
-const browserConfigureFlags = [
-  ...commonConfigureFlags,
-  "--enable-pthreads",
-  "--disable-w32threads",
-  "--disable-os2threads",
-  `--extra-cflags=-Oz -pthread -sUSE_ZLIB=1 -I${resolve(prefix, "include")}`,
-  `--extra-ldflags=-Oz -pthread -sUSE_ZLIB=1 -L${resolve(prefix, "lib")}`,
-];
-
-const nodeExeFlags = [
-  "LDEXEFLAGS=-Oz -pthread -sUSE_ZLIB=1 -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sPTHREAD_POOL_SIZE=4 -sPROXY_TO_PTHREAD=1 -sEXIT_RUNTIME=1 -sEXPORTED_RUNTIME_METHODS=FS,callMain",
-];
-
-const browserExeFlags = [
-  "LDEXEFLAGS=-Oz -pthread -sUSE_ZLIB=1 -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker -sALLOW_MEMORY_GROWTH=1 -sPTHREAD_POOL_SIZE=4 -sPROXY_TO_PTHREAD=1 -sEXIT_RUNTIME=1 -sEXPORTED_RUNTIME_METHODS=FS,callMain",
-];
+const commonExeFlags =
+  "-Oz -pthread -sUSE_ZLIB=1 -sMODULARIZE=1 -sEXPORT_ES6=1 -sALLOW_MEMORY_GROWTH=1 -sPTHREAD_POOL_SIZE=4 -sPROXY_TO_PTHREAD=1 -sEXIT_RUNTIME=1 -sEXPORTED_RUNTIME_METHODS=FS,callMain";
+const nodeExeFlags = [`LDEXEFLAGS=${commonExeFlags} -sENVIRONMENT=node -sNODERAWFS=1`];
+const browserExeFlags = [`LDEXEFLAGS=${commonExeFlags} -sENVIRONMENT=web,worker`];
 
 interface RunOptions {
   cwd?: string;
@@ -103,32 +99,19 @@ mkdirSync(cache, { recursive: true });
 ensureCheckout(nodeSrcDir, "https://github.com/FFmpeg/FFmpeg.git", ffmpegTag);
 ensureCheckout(browserSrcDir, "https://github.com/FFmpeg/FFmpeg.git", ffmpegTag);
 ensureCheckout(lameDir, "https://github.com/ffmpegwasm/lame.git", lameRef);
+ensureCheckout(libvpxDir, "https://chromium.googlesource.com/webm/libvpx", libvpxRef);
 
 rmSync(prefix, { recursive: true, force: true });
 mkdirSync(prefix, { recursive: true });
-run("emmake", ["make", "distclean"], { cwd: lameDir, allowFailure: true });
-run(
-  "emconfigure",
-  [
-    "./configure",
-    `--prefix=${prefix}`,
-    "--host=i686-linux",
-    "--disable-shared",
-    "--disable-frontend",
-    "--disable-analyzer-hooks",
-    "--disable-dependency-tracking",
-    "--disable-gtktest",
-  ],
-  { cwd: lameDir, env: { CFLAGS: "-Oz" } },
-);
-run("emmake", ["make", "-j", String(parallelJobs()), "install"], { cwd: lameDir });
+buildLame();
+buildLibvpx();
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
-buildFfmpeg(nodeSrcDir, nodeConfigureFlags, nodeExeFlags);
+buildFfmpeg(nodeSrcDir, nodeExeFlags);
 copyGeneratedTools(nodeSrcDir, dist);
 
-buildFfmpeg(browserSrcDir, browserConfigureFlags, browserExeFlags);
+buildFfmpeg(browserSrcDir, browserExeFlags);
 mkdirSync(browserDist, { recursive: true });
 copyGeneratedTools(browserSrcDir, browserDist);
 
@@ -141,9 +124,55 @@ for (const name of [
 ]) {
   cpSync(resolve(nodeSrcDir, name), resolve(dist, name));
 }
+cpSync(resolve(libvpxDir, "LICENSE"), resolve(dist, "LICENSE.libvpx"));
+cpSync(resolve(libvpxDir, "PATENTS"), resolve(dist, "PATENTS.libvpx"));
 
-function parallelJobs() {
-  return Math.max(1, Math.min(8, availableParallelism()));
+function buildLame() {
+  run("emmake", ["make", "distclean"], { cwd: lameDir, allowFailure: true });
+  run(
+    "emconfigure",
+    [
+      "./configure",
+      `--prefix=${prefix}`,
+      "--host=i686-linux",
+      "--disable-shared",
+      "--disable-frontend",
+      "--disable-analyzer-hooks",
+      "--disable-dependency-tracking",
+      "--disable-gtktest",
+    ],
+    { cwd: lameDir, env: { CFLAGS: "-Oz" } },
+  );
+  run("emmake", ["make", "-j", String(jobs), "install"], { cwd: lameDir });
+}
+
+function buildLibvpx() {
+  run("emmake", ["make", "clean"], { cwd: libvpxDir, allowFailure: true });
+  run(
+    "emconfigure",
+    [
+      "./configure",
+      `--prefix=${prefix}`,
+      "--target=generic-gnu",
+      "--disable-shared",
+      "--enable-static",
+      "--disable-examples",
+      "--disable-tools",
+      "--disable-docs",
+      "--disable-unit-tests",
+      "--disable-vp9",
+      "--disable-vp8-decoder",
+      "--enable-vp8-encoder",
+      "--disable-multithread",
+      "--disable-runtime-cpu-detect",
+      "--disable-webm-io",
+      "--disable-libyuv",
+      // Match the pthread-enabled FFmpeg module's wasm atomics ABI.
+      "--extra-cflags=-Oz -pthread",
+    ],
+    { cwd: libvpxDir },
+  );
+  run("emmake", ["make", "-j", String(jobs), "install"], { cwd: libvpxDir });
 }
 
 function ensureCheckout(dir: string, repo: string, ref: string) {
@@ -154,13 +183,13 @@ function ensureCheckout(dir: string, repo: string, ref: string) {
   run("git", ["checkout", "--force", "--detach", "FETCH_HEAD"], { cwd: dir });
 }
 
-function buildFfmpeg(srcDir: string, configureFlags: string[], exeFlags: string[]) {
+function buildFfmpeg(srcDir: string, exeFlags: string[]) {
   run("emmake", ["make", "distclean"], { cwd: srcDir, allowFailure: true });
-  run("emconfigure", ["./configure", ...configureFlags], {
+  run("emconfigure", ["./configure", ...ffmpegConfigureFlags], {
     cwd: srcDir,
     env: { PKG_CONFIG_PATH: resolve(prefix, "lib", "pkgconfig") },
   });
-  run("emmake", ["make", "-j", String(parallelJobs()), "ffmpeg", "ffprobe", ...exeFlags], {
+  run("emmake", ["make", "-j", String(jobs), "ffmpeg", "ffprobe", ...exeFlags], {
     cwd: srcDir,
   });
 }

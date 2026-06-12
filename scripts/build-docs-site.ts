@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";
-import { spawnSync } from "node:child_process";
+import { generateSampleVideo } from "./sample-video.js";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const docsDir = resolve(root, "docs");
@@ -58,7 +58,7 @@ for (const page of pages) {
 copyWorkbench();
 writeRedirectFallback();
 copyBrowserWasm();
-writeSampleVideo();
+await writeSampleVideo();
 copyAssets();
 const cnamePath = resolve(docsDir, "CNAME");
 if (existsSync(cnamePath)) {
@@ -445,6 +445,8 @@ function copyGeneratedLicenses(outputDir: string) {
     "COPYING.LGPLv3",
     "COPYING.GPLv2",
     "COPYING.GPLv3",
+    "LICENSE.libvpx",
+    "PATENTS.libvpx",
   ]) {
     const source = resolve(distRoot(), name);
     if (!existsSync(source)) {
@@ -458,43 +460,13 @@ function distRoot() {
   return resolve(root, "dist");
 }
 
-function writeSampleVideo() {
-  const samplePath = resolve(outDir, "sample.mp4");
-  const result = spawnSync(
-    "ffmpeg",
-    [
-      "-hide_banner",
-      "-loglevel",
-      "error",
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      "testsrc2=size=960x540:rate=24:duration=8",
-      "-f",
-      "lavfi",
-      "-i",
-      "sine=frequency=440:duration=8",
-      "-c:v",
-      "libx264",
-      "-pix_fmt",
-      "yuv420p",
-      "-c:a",
-      "aac",
-      samplePath,
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.status !== 0) {
-    if (allowMissingBrowserBundle) {
-      console.warn("sample video skipped: native ffmpeg unavailable");
-      return;
-    }
-    throw new Error("Failed to generate deployable sample.mp4 with native ffmpeg.");
+async function writeSampleVideo() {
+  const samplePath = resolve(outDir, "sample.webm");
+  if (allowMissingBrowserBundle && !existsSync(resolve(distRoot(), "ffmpeg.js"))) {
+    console.warn("sample video skipped: wasm bundle unavailable");
+    return;
   }
-  if (!existsSync(samplePath)) {
-    throw new Error("Failed to generate deployable sample.mp4.");
-  }
+  await generateSampleVideo(samplePath, { format: "webm" });
 }
 
 function llmsText() {

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
   createReadStream,
@@ -15,15 +14,17 @@ import { basename, extname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { runFfmpeg, runFfprobe } from "../src/index.js";
+import { generateSampleVideo } from "./sample-video.js";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const compiledPlaygroundDir = resolve(root, "lib", "playground");
 const playgroundDir = resolve(root, "playground");
 const scratchRoot = resolve(root, ".tmp", "playground");
-const sampleVideoPath = resolve(scratchRoot, "sample.mp4");
+const sampleVideoPath = resolve(scratchRoot, "sample-wasm.webm");
 const port = parsePort(process.env.FFMPEG_WASM_PLAYGROUND_PORT ?? process.env.PORT);
 const maxUploadBytes = 2 * 1024 * 1024 * 1024;
 const requestToken = randomBytes(24).toString("base64url");
+let sampleGeneration: Promise<void> | undefined;
 
 const operations = [
   "clip-mp4",
@@ -81,10 +82,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
   }
   if (request.method === "GET" && url.pathname === "/api/sample") {
     assertPlaygroundApiRequest(request);
-    ensureSampleVideo();
+    await ensureSampleVideo();
     await sendFile(response, sampleVideoPath, {
       "Content-Disposition": `inline; filename="${basename(sampleVideoPath)}"`,
-      "Content-Type": "video/mp4",
+      "Content-Type": "video/webm",
     });
     return;
   }
@@ -496,41 +497,21 @@ class HttpError extends Error {
   }
 }
 
-function ensureSampleVideo() {
+async function ensureSampleVideo() {
   try {
     statSync(sampleVideoPath);
     return;
   } catch {
     // Generate below.
   }
-  mkdirSync(scratchRoot, { recursive: true });
-  const result = spawnSync(
-    "ffmpeg",
-    [
-      "-hide_banner",
-      "-loglevel",
-      "error",
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      "testsrc2=size=960x540:rate=24:duration=8",
-      "-f",
-      "lavfi",
-      "-i",
-      "sine=frequency=440:duration=8",
-      "-c:v",
-      "libx264",
-      "-pix_fmt",
-      "yuv420p",
-      "-c:a",
-      "aac",
-      sampleVideoPath,
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || "Failed to generate sample video");
+  sampleGeneration ??= generateSampleVideo(sampleVideoPath, { format: "webm" });
+  const pendingGeneration = sampleGeneration;
+  try {
+    await pendingGeneration;
+  } finally {
+    if (sampleGeneration === pendingGeneration) {
+      sampleGeneration = undefined;
+    }
   }
 }
 

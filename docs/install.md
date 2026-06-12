@@ -11,12 +11,11 @@ description: "Install prerequisites and build the local wasm FFmpeg package."
 - pnpm 10.33+
 - Emscripten SDK with `emcc`, `em++`, `emar`, and `emranlib`
 - Autotools, `make`, `pkg-config`, `nasm`, and `yasm`
-- Native `ffmpeg` for verification fixtures and the playground sample video
 
 On macOS:
 
 ```sh
-brew install autoconf automake ffmpeg libtool nasm pkg-config yasm
+brew install autoconf automake libtool nasm pkg-config yasm
 ```
 
 ## Build

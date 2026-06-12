@@ -45,6 +45,7 @@ jobs:
       EM_CACHE: ${{ github.workspace }}/.cache/emcache
       FFMPEG_VERSION: n8.1.1
       LAME_REF: master
+      LIBVPX_REF: v1.16.0
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -67,7 +68,6 @@ jobs:
             autoconf \
             automake \
             build-essential \
-            ffmpeg \
             gawk \
             libtool \
             nasm \
@@ -87,8 +87,9 @@ jobs:
             .cache/FFmpeg
             .cache/FFmpeg-browser
             .cache/lame
+            .cache/libvpx
             .cache/emcache
-          key: wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
+          key: wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ env.LAME_REF }}-${{ env.LIBVPX_REF }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
           restore-keys: |
             wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-
             wasm-${{ runner.os }}-

@@ -12,6 +12,10 @@ The build intentionally starts from `--disable-all` and enables only the pieces 
 - `ffmpeg`
 - `ffprobe`
 
+## Input Devices
+
+- `lavfi` for wasm-only fixture and sample generation
+
 ## Protocols
 
 - `data`
@@ -42,6 +46,7 @@ The build intentionally starts from `--disable-all` and enables only the pieces 
 - `rawvideo`
 - `segment`
 - `wav`
+- `webm`
 
 ## Decoders
 
@@ -59,12 +64,15 @@ The build intentionally starts from `--disable-all` and enables only the pieces 
 - `vorbis`
 - `vp8`
 - `vp9`
+- `wrapped_avframe`
 
 ## Encoders
 
 - `libmp3lame`
+- `libvpx` (VP8)
 - `h263`
 - `mpeg4`
+- `opus`
 - `pcm_s16le`
 - `png`
 - `rawvideo`
@@ -81,6 +89,14 @@ The build intentionally starts from `--disable-all` and enables only the pieces 
 - `select`
 - `showinfo`
 - `signalstats`
+- `sine`
+- `testsrc2`
+
+## External Libraries
+
+- `libmp3lame`
+- `libvpx`
+- `zlib`
 
 ## Size Rule
 

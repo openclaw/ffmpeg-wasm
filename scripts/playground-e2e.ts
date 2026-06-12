@@ -150,6 +150,10 @@ try {
         "document.querySelector('[data-testid=status-text]')?.textContent.trim() === 'Ready'",
         180_000,
       );
+      await waitFor(
+        cdp,
+        "document.querySelector('[data-testid=preset-video-mp4]')?.classList.contains('active') && document.querySelector('[data-testid=command-preview]')?.value.includes('-c:v mpeg4')",
+      );
       await waitFor(cdp, "!document.querySelector('[data-testid=preset-audio-mp3]')?.disabled");
       await runtimeEvaluate(
         cdp,
@@ -296,6 +300,9 @@ function contentType(filePath: string) {
     }
     case ".mp4": {
       return "video/mp4";
+    }
+    case ".webm": {
+      return "video/webm";
     }
     case ".png": {
       return "image/png";

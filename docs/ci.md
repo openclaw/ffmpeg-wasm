@@ -16,7 +16,7 @@ PLAYGROUND_E2E_STATIC=1 pnpm playground:e2e
 
 `pnpm check` runs `tsgo`, strict type-aware `oxlint`, and `oxfmt --check`.
 
-`pnpm test:e2e` rebuilds FFmpeg and FFprobe from source, then runs live verifier coverage against the generated wasm assets.
+`pnpm test:e2e` rebuilds FFmpeg and FFprobe from source, then runs live verifier coverage against the generated wasm assets with external executable lookup disabled.
 
 `pnpm playground:e2e` launches Chrome through DevTools, loads the local playground, renders a smaller MP4 and MP3, and writes `.tmp/playground-e2e.png`.
 

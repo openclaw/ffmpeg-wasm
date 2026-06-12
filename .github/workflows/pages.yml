@@ -9,6 +9,7 @@ on:
       - "playground/**"
       - "scripts/build.ts"
       - "scripts/build-docs-site.ts"
+      - "scripts/sample-video.ts"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/pages.yml"
@@ -30,6 +31,7 @@ jobs:
       EM_CACHE: ${{ github.workspace }}/.cache/emcache
       FFMPEG_VERSION: n8.1.1
       LAME_REF: master
+      LIBVPX_REF: v1.16.0
       HAS_CLOUDFLARE_DEPLOY: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' && secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - name: Checkout
@@ -56,7 +58,6 @@ jobs:
             autoconf \
             automake \
             build-essential \
-            ffmpeg \
             gawk \
             libtool \
             nasm \
@@ -76,8 +77,9 @@ jobs:
             .cache/FFmpeg
             .cache/FFmpeg-browser
             .cache/lame
+            .cache/libvpx
             .cache/emcache
-          key: pages-wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
+          key: pages-wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ env.LAME_REF }}-${{ env.LIBVPX_REF }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
           restore-keys: |
             pages-wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-
             pages-wasm-${{ runner.os }}-

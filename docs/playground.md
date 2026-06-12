@@ -20,7 +20,7 @@ The workbench is a ffmpac test surface. It does not use browser-native media enc
 ## What It Does
 
 - Opens local video or audio files.
-- Generates a sample MP4 when native `ffmpeg` is installed.
+- Generates a browser-compatible VP8/Opus WebM sample through the bundled wasm FFmpeg.
 - Probes duration, codec, audio, and size.
 - Shows FFmpeg args before rendering.
 - Renders through this package's wasm wrapper.
@@ -42,7 +42,7 @@ The workbench is a ffmpac test surface. It does not use browser-native media enc
 
 `MP3 extract` is a normal ffmpac render path using the bundled LAME encoder.
 
-`Smaller MP4 video` downscales with FFmpeg's native MPEG-4 encoder. The quality menu maps to `-q:v`, where Small uses a higher quantizer and High uses a lower quantizer.
+`Smaller MP4 video` downscales with FFmpeg's built-in MPEG-4 encoder compiled to wasm. The quality menu maps to `-q:v`, where Small uses a higher quantizer and High uses a lower quantizer.
 
 ## Local Safety
 

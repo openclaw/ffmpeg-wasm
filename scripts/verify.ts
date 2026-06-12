@@ -4,10 +4,14 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFfmpeg, execFfprobe, runFfmpeg, runFfprobe, type RunResult } from "../src/index.js";
+import { generateSampleVideo } from "./sample-video.js";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const work = mkdtempSync(join(tmpdir(), "ffmpeg-wasm-verify-"));
 const missingDist = join(work, "missing-dist");
+
+// The verifier must remain runnable without resolving any external executable.
+process.env.PATH = "";
 
 try {
   const input = join(work, "input.mp4");
@@ -23,26 +27,15 @@ try {
   const mp3Segments = join(work, "mp3-part-%03d.mp3");
   mkdirSync(relativeCwd);
 
-  native("ffmpeg", [
-    "-hide_banner",
-    "-loglevel",
-    "error",
-    "-f",
-    "lavfi",
-    "-i",
-    "testsrc2=size=160x90:rate=10:duration=2",
-    "-f",
-    "lavfi",
-    "-i",
-    "sine=frequency=440:duration=2",
-    "-c:v",
-    "libx264",
-    "-pix_fmt",
-    "yuv420p",
-    "-c:a",
-    "aac",
-    input,
-  ]);
+  await step("wasm sample generation", () =>
+    generateSampleVideo(input, {
+      durationSeconds: 2,
+      frameRate: 10,
+      height: 90,
+      timeoutMs: 30_000,
+      width: 160,
+    }),
+  );
 
   await step("ffprobe duration", () => okProbe(input));
   await step("ffprobe json streams", () => okProbeJson(input));
@@ -194,8 +187,7 @@ try {
   assertFile(join(work, "part-000.wav"), 1024, "segment 0");
   assertFile(join(work, "mp3-part-000.mp3"), 1024, "mp3 segment 0");
 
-  const size = native("du", ["-sh", join(root, "dist")]).stdout.trim();
-  console.log(`verify ok (${size})`);
+  console.log("verify ok");
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
@@ -594,14 +586,6 @@ function parseProbeJson(text: string): ProbeJson {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function native(cmd: string, args: string[]) {
-  const result = spawnSync(cmd, args, { encoding: "utf8" });
-  if (result.status !== 0) {
-    throw new Error(`${cmd} failed: ${result.stderr || result.stdout}`);
-  }
-  return result;
 }
 
 function fail(label: string, result: RunResult): never {

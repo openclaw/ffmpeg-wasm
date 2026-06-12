@@ -344,11 +344,7 @@ function renderPresets() {
         <span class="preset-ext">${preset.extension}</span>
       `;
       button.addEventListener("click", () => {
-        state.operation = preset.id;
-        state.commandEdited = false;
-        renderPresets();
-        updateControls();
-        updateCommand();
+        selectOperation(preset.id);
       });
       return button;
     }),
@@ -357,14 +353,15 @@ function renderPresets() {
 
 async function loadSample() {
   setStatus("Loading sample", "busy");
-  const response = await fetch(hasServerBackend() ? "/api/sample" : "sample.mp4", {
+  const response = await fetch(hasServerBackend() ? "/api/sample" : "sample.webm", {
     headers: hasServerBackend() ? playgroundHeaders() : {},
   });
   if (!response.ok) {
     await failFromResponse(response);
   }
   const blob = await response.blob();
-  await setSourceFile(new File([blob], "sample.mp4", { type: "video/mp4" }));
+  selectOperation("video-mp4");
+  await setSourceFile(new File([blob], "sample.webm", { type: "video/webm" }));
 }
 
 async function setSourceFile(file: File) {
@@ -565,11 +562,17 @@ function bindSourceVideo(video: HTMLVideoElement) {
 function selectPosterFrame(seconds: number) {
   elements.frameInput.value = formatSeconds(seconds);
   if (state.operation !== "poster-png") {
-    state.operation = "poster-png";
-    state.commandEdited = false;
-    renderPresets();
-    updateControls();
+    selectOperation("poster-png");
+    return;
   }
+  updateCommand();
+}
+
+function selectOperation(operation: Operation) {
+  state.operation = operation;
+  state.commandEdited = false;
+  renderPresets();
+  updateControls();
   updateCommand();
 }
 

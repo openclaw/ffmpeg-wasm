@@ -20,7 +20,7 @@ Many media workflows need predictable FFmpeg and FFprobe behavior without carryi
 
 The wrapper, scripts, and documentation in this repository are MIT licensed.
 
-Generated FFmpeg assets in `dist/` are copied from FFmpeg and are LGPL-2.1-or-later. The build does not pass `--enable-gpl` or `--enable-nonfree`. FFmpeg license files are copied into `dist/` during `pnpm build`.
+Generated FFmpeg assets in `dist/` are copied from FFmpeg and are LGPL-2.1-or-later. Linked libvpx code is BSD-licensed. The build does not pass `--enable-gpl` or `--enable-nonfree`. FFmpeg and libvpx license files are copied into `dist/` during `pnpm build`.
 
 Keep wrapper code and generated FFmpeg binaries conceptually separate when this moves under OpenClaw packaging. A downstream package can stay MIT for the wrapper while distributing the FFmpeg wasm artifacts under the LGPL terms that apply to FFmpeg.
 
@@ -30,6 +30,7 @@ Default refs:
 
 - FFmpeg: `n8.1.1`
 - LAME: `master` from `ffmpegwasm/lame`
+- libvpx: `v1.16.0`
 - Runtime: Node 24+
 - Compiler: Emscripten via `emcc`
 
@@ -68,6 +69,7 @@ Enabled muxers:
 - `rawvideo`
 - `segment`
 - `wav`
+- `webm`
 
 Enabled decoders:
 
@@ -85,12 +87,15 @@ Enabled decoders:
 - `vorbis`
 - `vp8`
 - `vp9`
+- `wrapped_avframe`
 
 Enabled encoders:
 
 - `h263`
 - `libmp3lame`
+- `libvpx` (VP8)
 - `mpeg4`
+- `opus`
 - `pcm_s16le`
 - `png`
 - `rawvideo`
@@ -111,9 +116,10 @@ Enabled filters:
 External libraries:
 
 - `libmp3lame`
+- `libvpx`
 - `zlib`
 
-The verified `dist/` size is about 8.1 MB on current builds.
+Each generated Node or browser FFmpeg/FFprobe bundle is about 8.5 MB on current builds.
 
 ## Install
 
@@ -126,12 +132,11 @@ Required system tools for a full wasm build:
 - Emscripten SDK with `emcc`, `em++`, `emar`, and `emranlib` on `PATH`
 - Autotools for LAME
 - `make`, `pkg-config`, `nasm`, `yasm`
-- Native `ffmpeg` for `pnpm verify`
 
 On macOS:
 
 ```sh
-brew install autoconf automake ffmpeg libtool nasm pkg-config yasm
+brew install autoconf automake libtool nasm pkg-config yasm
 ```
 
 ## Commands
@@ -146,7 +151,7 @@ pnpm test:e2e
 pnpm check
 ```
 
-`pnpm build` compiles TypeScript, fetches the configured FFmpeg/LAME refs into `.cache/`, builds static LAME, builds FFmpeg/FFprobe wasm, and writes generated assets to `dist/`.
+`pnpm build` compiles TypeScript, fetches the configured FFmpeg/LAME/libvpx refs into `.cache/`, builds static LAME and libvpx, builds FFmpeg/FFprobe wasm, and writes generated assets to `dist/`.
 
 `pnpm docs:build` builds the static site into `dist/docs-site`: the media workbench at `/`, its compiled TypeScript client and browser ffmpac worker, the browser wasm bundle, and documentation under `/docs/`.
 
@@ -154,7 +159,7 @@ pnpm check
 
 `pnpm playground:e2e` starts the playground on a temporary port, launches Chrome through DevTools, loads the sample video, renders a smaller MP4 and an MP3, and writes `.tmp/playground-e2e.png` for visual proof. Set `PLAYGROUND_E2E_STATIC=1` to test the static `dist/docs-site` workbench with `/api/*` blocked and only browser ffmpac available.
 
-`pnpm verify` creates a tiny native test video, then exercises FFprobe text and JSON output, WAV/MP3 extraction, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, segmentation, cwd/dist overrides, API validation failures, and CLI success/failure paths.
+`pnpm verify` creates a tiny test video through the wasm build with external executable lookup disabled, then exercises FFprobe text and JSON output, WAV/MP3 extraction, stdin pipe input, stdout pipe output, PNG frame output, rawvideo byte equality, segmentation, cwd/dist overrides, API validation failures, and CLI success/failure paths.
 
 `pnpm test:e2e` rebuilds the wasm assets from source, then runs the same live verifier against the generated FFmpeg/FFprobe wrappers.
 
@@ -246,7 +251,7 @@ For direct package usage, import the TypeScript API and keep `dist/` next to the
 Override source refs per build:
 
 ```sh
-FFMPEG_VERSION=n8.1.1 LAME_REF=master pnpm build
+FFMPEG_VERSION=n8.1.1 LAME_REF=master LIBVPX_REF=v1.16.0 pnpm build
 ```
 
 To keep the binary small, only add codecs, demuxers, muxers, filters, or protocols when a real caller needs them. Prefer adding one capability and extending `scripts/verify.ts` with a matching proof.
