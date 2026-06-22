@@ -49,7 +49,7 @@ jobs:
       EM_CACHE: ${{ github.workspace }}/.cache/emcache
       FFMPEG_VERSION: n8.1.1
       FFMPEG_WASM_VERIFY_OUTPUT_DIR: .tmp/verify-proof
-      LAME_REF: master
+      LAME_REF: 2badea1974ae36cb8312afe99cff1e6b3b5decee
       LIBVPX_REF: v1.16.0
     steps:
       - name: Checkout

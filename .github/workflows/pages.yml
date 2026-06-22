@@ -30,7 +30,7 @@ jobs:
     env:
       EM_CACHE: ${{ github.workspace }}/.cache/emcache
       FFMPEG_VERSION: n8.1.1
-      LAME_REF: master
+      LAME_REF: 2badea1974ae36cb8312afe99cff1e6b3b5decee
       LIBVPX_REF: v1.16.0
       HAS_CLOUDFLARE_DEPLOY: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' && secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:

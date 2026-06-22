@@ -1,247 +1,247 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="playground-token" content="__PLAYGROUND_TOKEN__" />
-    <title>ffmpeg.sh Workbench</title>
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <main class="workspace">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">ffmpeg.sh workbench</p>
-          <h1>Media Workbench</h1>
-        </div>
-        <div class="top-actions">
-          <button
-            id="sampleButton"
-            class="icon-button"
-            type="button"
-            data-testid="sample-button"
-            title="Load sample media"
-          >
-            Sample
-          </button>
-          <a class="icon-button" href="/docs/" title="Open documentation">Docs</a>
-          <a
-            class="icon-button"
-            href="https://github.com/openclaw/ffmpeg-wasm"
-            title="Open GitHub repository"
-          >
-            GitHub
-          </a>
-          <div class="status-pill" data-testid="status-pill">
-            <span class="status-dot"></span>
-            <span id="statusText" data-testid="status-text">Idle</span>
-          </div>
-        </div>
-      </header>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="playground-token" content="__PLAYGROUND_TOKEN__" />
+		<title>ffmpeg.sh Workbench</title>
+		<link rel="stylesheet" href="/styles.css" />
+	</head>
+	<body>
+		<main class="workspace">
+			<header class="topbar">
+				<div>
+					<p class="eyebrow">ffmpeg.sh workbench</p>
+					<h1>Media Workbench</h1>
+				</div>
+				<div class="top-actions">
+					<button
+						id="sampleButton"
+						class="icon-button"
+						type="button"
+						data-testid="sample-button"
+						title="Load sample media"
+					>
+						Sample
+					</button>
+					<a class="icon-button" href="/docs/" title="Open documentation">Docs</a>
+					<a
+						class="icon-button"
+						href="https://github.com/openclaw/ffmpeg-wasm"
+						title="Open GitHub repository"
+					>
+						GitHub
+					</a>
+					<div class="status-pill" data-testid="status-pill">
+						<span class="status-dot"></span>
+						<span id="statusText" data-testid="status-text">Idle</span>
+					</div>
+				</div>
+			</header>
 
-      <section class="stage-grid">
-        <section class="viewer-panel source-panel" aria-label="Source media">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Source</p>
-              <h2 id="sourceTitle">No media loaded</h2>
-            </div>
-            <div class="button-row">
-              <label class="icon-button file-pick" title="Open video">
-                <input
-                  id="fileInput"
-                  type="file"
-                  accept="video/*,audio/*"
-                  data-testid="file-input"
-                />
-                <span aria-hidden="true">Open</span>
-              </label>
-            </div>
-          </div>
-          <div id="sourceViewer" class="media-frame empty">
-            <span>Select media</span>
-          </div>
-          <dl class="metrics" id="sourceMetrics">
-            <div>
-              <dt>Duration</dt>
-              <dd>-</dd>
-            </div>
-            <div>
-              <dt>Video</dt>
-              <dd>-</dd>
-            </div>
-            <div>
-              <dt>Audio</dt>
-              <dd>-</dd>
-            </div>
-            <div>
-              <dt>Size</dt>
-              <dd>-</dd>
-            </div>
-          </dl>
-        </section>
+			<section class="stage-grid">
+				<section class="viewer-panel source-panel" aria-label="Source media">
+					<div class="panel-head">
+						<div>
+							<p class="eyebrow">Source</p>
+							<h2 id="sourceTitle">No media loaded</h2>
+						</div>
+						<div class="button-row">
+							<label class="icon-button file-pick" title="Open video">
+								<input
+									id="fileInput"
+									type="file"
+									accept="video/*,audio/*"
+									data-testid="file-input"
+								/>
+								<span aria-hidden="true">Open</span>
+							</label>
+						</div>
+					</div>
+					<div id="sourceViewer" class="media-frame empty">
+						<span>Select media</span>
+					</div>
+					<dl class="metrics" id="sourceMetrics">
+						<div>
+							<dt>Duration</dt>
+							<dd>-</dd>
+						</div>
+						<div>
+							<dt>Video</dt>
+							<dd>-</dd>
+						</div>
+						<div>
+							<dt>Audio</dt>
+							<dd>-</dd>
+						</div>
+						<div>
+							<dt>Size</dt>
+							<dd>-</dd>
+						</div>
+					</dl>
+				</section>
 
-        <section class="viewer-panel output-panel" aria-label="Rendered output">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Output</p>
-              <h2 id="outputTitle" data-testid="output-title">Waiting</h2>
-            </div>
-            <button
-              id="saveButton"
-              class="icon-button strong"
-              type="button"
-              disabled
-              data-testid="save-button"
-            >
-              Save
-            </button>
-          </div>
-          <div id="outputViewer" class="media-frame empty" data-testid="output-viewer">
-            <span>Render result</span>
-          </div>
-          <dl class="metrics compact" id="outputMetrics" data-testid="output-metrics">
-            <div>
-              <dt>Format</dt>
-              <dd>-</dd>
-            </div>
-            <div>
-              <dt>Output</dt>
-              <dd>-</dd>
-            </div>
-            <div>
-              <dt>Delta</dt>
-              <dd>-</dd>
-            </div>
-          </dl>
-        </section>
-      </section>
+				<section class="viewer-panel output-panel" aria-label="Rendered output">
+					<div class="panel-head">
+						<div>
+							<p class="eyebrow">Output</p>
+							<h2 id="outputTitle" data-testid="output-title">Waiting</h2>
+						</div>
+						<button
+							id="saveButton"
+							class="icon-button strong"
+							type="button"
+							disabled
+							data-testid="save-button"
+						>
+							Save
+						</button>
+					</div>
+					<div id="outputViewer" class="media-frame empty" data-testid="output-viewer">
+						<span>Render result</span>
+					</div>
+					<dl class="metrics compact" id="outputMetrics" data-testid="output-metrics">
+						<div>
+							<dt>Format</dt>
+							<dd>-</dd>
+						</div>
+						<div>
+							<dt>Output</dt>
+							<dd>-</dd>
+						</div>
+						<div>
+							<dt>Delta</dt>
+							<dd>-</dd>
+						</div>
+					</dl>
+				</section>
+			</section>
 
-      <section class="control-deck">
-        <section class="preset-panel" aria-label="Presets">
-          <div class="panel-head slim">
-            <div>
-              <p class="eyebrow">Preset</p>
-              <h2>Operation</h2>
-            </div>
-          </div>
-          <div class="preset-list" id="presetList" data-testid="preset-list"></div>
-        </section>
+			<section class="control-deck">
+				<section class="preset-panel" aria-label="Presets">
+					<div class="panel-head slim">
+						<div>
+							<p class="eyebrow">Preset</p>
+							<h2>Operation</h2>
+						</div>
+					</div>
+					<div class="preset-list" id="presetList" data-testid="preset-list"></div>
+				</section>
 
-        <section class="parameter-panel" aria-label="Parameters">
-          <div class="panel-head slim">
-            <div>
-              <p class="eyebrow">Parameters</p>
-              <h2 id="parameterTitle">Lossless clip</h2>
-            </div>
-          </div>
+				<section class="parameter-panel" aria-label="Parameters">
+					<div class="panel-head slim">
+						<div>
+							<p class="eyebrow">Parameters</p>
+							<h2 id="parameterTitle">Lossless clip</h2>
+						</div>
+					</div>
 
-          <div class="fields">
-            <label class="field clip-field">
-              <span>Start</span>
-              <input id="startInput" type="number" min="0" step="0.1" value="0" />
-            </label>
-            <label class="field clip-field">
-              <span>Duration</span>
-              <input id="durationInput" type="number" min="0.2" step="0.1" value="5" />
-            </label>
-            <label class="field frame-field">
-              <span>Frame</span>
-              <input id="frameInput" type="number" min="0" step="0.1" value="1" />
-            </label>
-            <label class="field size-field">
-              <span>Width</span>
-              <select id="widthSelect">
-                <option value="426">426 / 240p</option>
-                <option value="640">640 / 360p</option>
-                <option value="854">854 / 480p</option>
-                <option value="1280" selected>1280 / 720p</option>
-                <option value="1920">1920 / 1080p</option>
-              </select>
-            </label>
-            <label class="field video-quality-field">
-              <span>Quality</span>
-              <select id="qualitySelect">
-                <option value="small">Small</option>
-                <option value="balanced" selected>Balanced</option>
-                <option value="high">High</option>
-              </select>
-            </label>
-            <label class="field audio-field">
-              <span>Bitrate</span>
-              <select id="bitrateSelect">
-                <option value="48k">48k</option>
-                <option value="96k">96k</option>
-                <option value="128k" selected>128k</option>
-                <option value="192k">192k</option>
-              </select>
-            </label>
-            <label class="field audio-field">
-              <span>Rate</span>
-              <select id="sampleRateSelect">
-                <option value="16000">16 kHz</option>
-                <option value="24000">24 kHz</option>
-                <option value="44100" selected>44.1 kHz</option>
-                <option value="48000">48 kHz</option>
-              </select>
-            </label>
-            <label class="field audio-field">
-              <span>Channels</span>
-              <select id="channelsSelect">
-                <option value="1">Mono</option>
-                <option value="2" selected>Stereo</option>
-              </select>
-            </label>
-          </div>
+					<div class="fields">
+						<label class="field clip-field">
+							<span>Start</span>
+							<input id="startInput" type="number" min="0" step="0.1" value="0" />
+						</label>
+						<label class="field clip-field">
+							<span>Duration</span>
+							<input id="durationInput" type="number" min="0.2" step="0.1" value="5" />
+						</label>
+						<label class="field frame-field">
+							<span>Frame</span>
+							<input id="frameInput" type="number" min="0" step="0.1" value="1" />
+						</label>
+						<label class="field size-field">
+							<span>Width</span>
+							<select id="widthSelect">
+								<option value="426">426 / 240p</option>
+								<option value="640">640 / 360p</option>
+								<option value="854">854 / 480p</option>
+								<option value="1280" selected>1280 / 720p</option>
+								<option value="1920">1920 / 1080p</option>
+							</select>
+						</label>
+						<label class="field video-quality-field">
+							<span>Quality</span>
+							<select id="qualitySelect">
+								<option value="small">Small</option>
+								<option value="balanced" selected>Balanced</option>
+								<option value="high">High</option>
+							</select>
+						</label>
+						<label class="field audio-field">
+							<span>Bitrate</span>
+							<select id="bitrateSelect">
+								<option value="48k">48k</option>
+								<option value="96k">96k</option>
+								<option value="128k" selected>128k</option>
+								<option value="192k">192k</option>
+							</select>
+						</label>
+						<label class="field audio-field">
+							<span>Rate</span>
+							<select id="sampleRateSelect">
+								<option value="16000">16 kHz</option>
+								<option value="24000">24 kHz</option>
+								<option value="44100" selected>44.1 kHz</option>
+								<option value="48000">48 kHz</option>
+							</select>
+						</label>
+						<label class="field audio-field">
+							<span>Channels</span>
+							<select id="channelsSelect">
+								<option value="1">Mono</option>
+								<option value="2" selected>Stereo</option>
+							</select>
+						</label>
+					</div>
 
-          <div class="command-block">
-            <div class="command-head">
-              <span>Command</span>
-              <div class="button-row">
-                <button id="presetArgsButton" class="text-button" type="button">Preset args</button>
-                <button id="copyButton" class="text-button" type="button">Copy</button>
-              </div>
-            </div>
-            <textarea
-              id="commandInput"
-              autocomplete="off"
-              spellcheck="false"
-              data-testid="command-preview"
-            ></textarea>
-          </div>
+					<div class="command-block">
+						<div class="command-head">
+							<span>Command</span>
+							<div class="button-row">
+								<button id="presetArgsButton" class="text-button" type="button">Preset args</button>
+								<button id="copyButton" class="text-button" type="button">Copy</button>
+							</div>
+						</div>
+						<textarea
+							id="commandInput"
+							autocomplete="off"
+							spellcheck="false"
+							data-testid="command-preview"
+						></textarea>
+					</div>
 
-          <div id="progressPanel" class="progress-panel" data-testid="progress-panel" hidden>
-            <div class="progress-head">
-              <span id="progressDetail" data-testid="progress-detail"></span>
-              <span id="progressValue" data-testid="progress-value">0%</span>
-            </div>
-            <div class="progress-track" aria-hidden="true">
-              <span id="progressBar" class="progress-bar"></span>
-            </div>
-          </div>
+					<div id="progressPanel" class="progress-panel" data-testid="progress-panel" hidden>
+						<div class="progress-head">
+							<span id="progressDetail" data-testid="progress-detail"></span>
+							<span id="progressValue" data-testid="progress-value">0%</span>
+						</div>
+						<div class="progress-track" aria-hidden="true">
+							<span id="progressBar" class="progress-bar"></span>
+						</div>
+					</div>
 
-          <div class="action-row">
-            <button
-              id="renderButton"
-              class="primary-action"
-              type="button"
-              data-testid="render-button"
-            >
-              Render preview
-            </button>
-            <button
-              id="renderSaveButton"
-              class="secondary-action"
-              type="button"
-              data-testid="render-save-button"
-            >
-              Render and save
-            </button>
-          </div>
-        </section>
-      </section>
-    </main>
+					<div class="action-row">
+						<button
+							id="renderButton"
+							class="primary-action"
+							type="button"
+							data-testid="render-button"
+						>
+							Render preview
+						</button>
+						<button
+							id="renderSaveButton"
+							class="secondary-action"
+							type="button"
+							data-testid="render-save-button"
+						>
+							Render and save
+						</button>
+					</div>
+				</section>
+			</section>
+		</main>
 
-    <script src="/app.js" type="module"></script>
-  </body>
+		<script src="/app.js" type="module"></script>
+	</body>
 </html>

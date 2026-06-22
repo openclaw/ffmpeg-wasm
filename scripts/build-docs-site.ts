@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	statSync,
+	writeFileSync,
 } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import { generateSampleVideo } from "./sample-video.js";
@@ -24,23 +24,23 @@ const tagline = "Lightweight FFmpeg WebAssembly for local media automation";
 const allowMissingBrowserBundle = process.argv.includes("--allow-missing-browser");
 
 interface Frontmatter {
-  description?: string;
-  permalink?: string;
-  title?: string;
+	description?: string;
+	permalink?: string;
+	title?: string;
 }
 
 interface Page {
-  body: string;
-  description: string;
-  outRel: string;
-  rel: string;
-  title: string;
+	body: string;
+	description: string;
+	outRel: string;
+	rel: string;
+	title: string;
 }
 
 const nav = [
-  ["Start", ["index.md", "install.md", "build-surface.md"]],
-  ["Use", ["api.md", "cli.md", "playground.md", "recipes.md"]],
-  ["Project", ["licensing.md", "ci.md", "domains.md"]],
+	["Start", ["index.md", "install.md", "build-surface.md"]],
+	["Use", ["api.md", "cli.md", "playground.md", "recipes.md"]],
+	["Project", ["licensing.md", "ci.md", "domains.md"]],
 ] as const;
 
 rmSync(outDir, { force: true, recursive: true });
@@ -49,10 +49,10 @@ mkdirSync(outDir, { recursive: true });
 const pages = readPages();
 const pageByRel = new Map(pages.map((page) => [page.rel, page]));
 for (const page of pages) {
-  const html = markdownToHtml(page.body, page);
-  const outputPath = resolve(outDir, page.outRel);
-  mkdirSync(dirname(outputPath), { recursive: true });
-  writeFileSync(outputPath, layout(page, html), "utf8");
+	const html = markdownToHtml(page.body, page);
+	const outputPath = resolve(outDir, page.outRel);
+	mkdirSync(dirname(outputPath), { recursive: true });
+	writeFileSync(outputPath, layout(page, html), "utf8");
 }
 
 copyWorkbench();
@@ -62,7 +62,7 @@ await writeSampleVideo();
 copyAssets();
 const cnamePath = resolve(docsDir, "CNAME");
 if (existsSync(cnamePath)) {
-  writeFileSync(resolve(outDir, "CNAME"), `${readFileSync(cnamePath, "utf8").trim()}\n`);
+	writeFileSync(resolve(outDir, "CNAME"), `${readFileSync(cnamePath, "utf8").trim()}\n`);
 }
 writeFileSync(resolve(outDir, ".nojekyll"), "");
 writeFileSync(resolve(outDir, "_headers"), headersText(), "utf8");
@@ -70,228 +70,228 @@ writeFileSync(resolve(outDir, "llms.txt"), llmsText(), "utf8");
 console.log(`built docs site: ${relative(root, outDir)}`);
 
 function readPages() {
-  return markdownFiles(docsDir).map((file) => {
-    const rel = relative(docsDir, file).replaceAll(sep, "/");
-    const raw = readFileSync(file, "utf8");
-    const parsed = parseFrontmatter(raw);
-    const title =
-      parsed.frontmatter.title ?? firstHeading(parsed.body) ?? titleize(basename(rel, ".md"));
-    return {
-      body: parsed.body.trim(),
-      description: parsed.frontmatter.description ?? tagline,
-      outRel: outputRel(rel, parsed.frontmatter),
-      rel,
-      title,
-    };
-  });
+	return markdownFiles(docsDir).map((file) => {
+		const rel = relative(docsDir, file).replaceAll(sep, "/");
+		const raw = readFileSync(file, "utf8");
+		const parsed = parseFrontmatter(raw);
+		const title =
+			parsed.frontmatter.title ?? firstHeading(parsed.body) ?? titleize(basename(rel, ".md"));
+		return {
+			body: parsed.body.trim(),
+			description: parsed.frontmatter.description ?? tagline,
+			outRel: outputRel(rel, parsed.frontmatter),
+			rel,
+			title,
+		};
+	});
 }
 
 function markdownFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true })
-    .flatMap((entry) => {
-      const full = resolve(dir, entry.name);
-      if (entry.isDirectory()) {
-        return markdownFiles(full);
-      }
-      return entry.isFile() && entry.name.endsWith(".md") ? [full] : [];
-    })
-    .toSorted();
+	return readdirSync(dir, { withFileTypes: true })
+		.flatMap((entry) => {
+			const full = resolve(dir, entry.name);
+			if (entry.isDirectory()) {
+				return markdownFiles(full);
+			}
+			return entry.isFile() && entry.name.endsWith(".md") ? [full] : [];
+		})
+		.toSorted();
 }
 
 function parseFrontmatter(raw: string) {
-  const match = /^---\n(?<frontmatter>[\s\S]*?)\n---\n?/u.exec(raw);
-  if (!match?.groups) {
-    return { body: raw, frontmatter: {} satisfies Frontmatter };
-  }
-  const frontmatter: Frontmatter = {};
-  for (const line of match.groups.frontmatter.split("\n")) {
-    const item = /^(?<key>[A-Za-z0-9_-]+):\s*(?<value>.*?)\s*$/u.exec(line);
-    if (!item?.groups) {
-      continue;
-    }
-    const value = item.groups.value.replaceAll(/^["']|["']$/gu, "");
-    switch (item.groups.key) {
-      case "description": {
-        frontmatter.description = value;
-        break;
-      }
-      case "permalink": {
-        frontmatter.permalink = value;
-        break;
-      }
-      case "title": {
-        frontmatter.title = value;
-        break;
-      }
-      default: {
-        break;
-      }
-    }
-  }
-  return { body: raw.slice(match[0].length), frontmatter };
+	const match = /^---\n(?<frontmatter>[\s\S]*?)\n---\n?/u.exec(raw);
+	if (!match?.groups) {
+		return { body: raw, frontmatter: {} satisfies Frontmatter };
+	}
+	const frontmatter: Frontmatter = {};
+	for (const line of match.groups.frontmatter.split("\n")) {
+		const item = /^(?<key>[A-Za-z0-9_-]+):\s*(?<value>.*?)\s*$/u.exec(line);
+		if (!item?.groups) {
+			continue;
+		}
+		const value = item.groups.value.replaceAll(/^["']|["']$/gu, "");
+		switch (item.groups.key) {
+			case "description": {
+				frontmatter.description = value;
+				break;
+			}
+			case "permalink": {
+				frontmatter.permalink = value;
+				break;
+			}
+			case "title": {
+				frontmatter.title = value;
+				break;
+			}
+			default: {
+				break;
+			}
+		}
+	}
+	return { body: raw.slice(match[0].length), frontmatter };
 }
 
 function outputRel(rel: string, frontmatter: Frontmatter) {
-  if (typeof frontmatter.permalink === "string" && frontmatter.permalink.length > 0) {
-    const permalink = normalizePermalink(frontmatter.permalink);
-    return permalink === "/" ? "index.html" : `${permalink.slice(1)}/index.html`;
-  }
-  if (rel === "index.md") {
-    return "index.html";
-  }
-  return `docs/${rel.replaceAll(/\.md$/gu, ".html")}`;
+	if (typeof frontmatter.permalink === "string" && frontmatter.permalink.length > 0) {
+		const permalink = normalizePermalink(frontmatter.permalink);
+		return permalink === "/" ? "index.html" : `${permalink.slice(1)}/index.html`;
+	}
+	if (rel === "index.md") {
+		return "docs/index.html";
+	}
+	return `docs/${rel.replaceAll(/\.md$/gu, ".html")}`;
 }
 
 function normalizePermalink(value: string) {
-  let permalink = value.trim();
-  if (!permalink.startsWith("/")) {
-    permalink = `/${permalink}`;
-  }
-  if (permalink.length > 1 && permalink.endsWith("/")) {
-    permalink = permalink.slice(0, -1);
-  }
-  return permalink;
+	let permalink = value.trim();
+	if (!permalink.startsWith("/")) {
+		permalink = `/${permalink}`;
+	}
+	if (permalink.length > 1 && permalink.endsWith("/")) {
+		permalink = permalink.slice(0, -1);
+	}
+	return permalink;
 }
 
 function markdownToHtml(markdown: string, page: Page) {
-  const lines = markdown.replaceAll("\r\n", "\n").split("\n");
-  const html: string[] = [];
-  let paragraph: string[] = [];
-  let list: "ol" | "ul" | undefined;
-  let code: { language: string; lines: string[] } | undefined;
+	const lines = markdown.replaceAll("\r\n", "\n").split("\n");
+	const html: string[] = [];
+	let paragraph: string[] = [];
+	let list: "ol" | "ul" | undefined;
+	let code: { language: string; lines: string[] } | undefined;
 
-  const flushParagraph = () => {
-    if (paragraph.length === 0) {
-      return;
-    }
-    html.push(`<p>${inline(paragraph.join(" "), page)}</p>`);
-    paragraph = [];
-  };
-  const closeList = () => {
-    if (!list) {
-      return;
-    }
-    html.push(`</${list}>`);
-    list = undefined;
-  };
+	const flushParagraph = () => {
+		if (paragraph.length === 0) {
+			return;
+		}
+		html.push(`<p>${inline(paragraph.join(" "), page)}</p>`);
+		paragraph = [];
+	};
+	const closeList = () => {
+		if (!list) {
+			return;
+		}
+		html.push(`</${list}>`);
+		list = undefined;
+	};
 
-  for (const line of lines) {
-    const fence = /^```(?<language>[A-Za-z0-9_-]*)\s*$/u.exec(line);
-    if (fence?.groups) {
-      if (code) {
-        html.push(
-          `<pre><code class="language-${escapeHtml(code.language)}">${escapeHtml(code.lines.join("\n"))}</code></pre>`,
-        );
-        code = undefined;
-      } else {
-        flushParagraph();
-        closeList();
-        code = { language: fence.groups.language, lines: [] };
-      }
-      continue;
-    }
-    if (code) {
-      code.lines.push(line);
-      continue;
-    }
+	for (const line of lines) {
+		const fence = /^```(?<language>[A-Za-z0-9_-]*)\s*$/u.exec(line);
+		if (fence?.groups) {
+			if (code) {
+				html.push(
+					`<pre><code class="language-${escapeHtml(code.language)}">${escapeHtml(code.lines.join("\n"))}</code></pre>`,
+				);
+				code = undefined;
+			} else {
+				flushParagraph();
+				closeList();
+				code = { language: fence.groups.language, lines: [] };
+			}
+			continue;
+		}
+		if (code) {
+			code.lines.push(line);
+			continue;
+		}
 
-    if (line.trim() === "") {
-      flushParagraph();
-      closeList();
-      continue;
-    }
+		if (line.trim() === "") {
+			flushParagraph();
+			closeList();
+			continue;
+		}
 
-    const heading = /^(?<level>#{1,4})\s+(?<text>.+)$/u.exec(line);
-    if (heading?.groups) {
-      flushParagraph();
-      closeList();
-      const level = heading.groups.level.length;
-      const text = heading.groups.text.trim();
-      const id = slug(text);
-      html.push(
-        `<h${level} id="${id}">${inline(text, page)}<a href="#${id}" aria-label="Link to ${escapeAttribute(text)}">#</a></h${level}>`,
-      );
-      continue;
-    }
+		const heading = /^(?<level>#{1,4})\s+(?<text>.+)$/u.exec(line);
+		if (heading?.groups) {
+			flushParagraph();
+			closeList();
+			const level = heading.groups.level.length;
+			const text = heading.groups.text.trim();
+			const id = slug(text);
+			html.push(
+				`<h${level} id="${id}">${inline(text, page)}<a href="#${id}" aria-label="Link to ${escapeAttribute(text)}">#</a></h${level}>`,
+			);
+			continue;
+		}
 
-    const unordered = /^-\s+(?<text>.+)$/u.exec(line);
-    if (unordered?.groups) {
-      flushParagraph();
-      if (list !== "ul") {
-        closeList();
-        list = "ul";
-        html.push("<ul>");
-      }
-      html.push(`<li>${inline(unordered.groups.text, page)}</li>`);
-      continue;
-    }
+		const unordered = /^-\s+(?<text>.+)$/u.exec(line);
+		if (unordered?.groups) {
+			flushParagraph();
+			if (list !== "ul") {
+				closeList();
+				list = "ul";
+				html.push("<ul>");
+			}
+			html.push(`<li>${inline(unordered.groups.text, page)}</li>`);
+			continue;
+		}
 
-    const ordered = /^\d+\.\s+(?<text>.+)$/u.exec(line);
-    if (ordered?.groups) {
-      flushParagraph();
-      if (list !== "ol") {
-        closeList();
-        list = "ol";
-        html.push("<ol>");
-      }
-      html.push(`<li>${inline(ordered.groups.text, page)}</li>`);
-      continue;
-    }
+		const ordered = /^\d+\.\s+(?<text>.+)$/u.exec(line);
+		if (ordered?.groups) {
+			flushParagraph();
+			if (list !== "ol") {
+				closeList();
+				list = "ol";
+				html.push("<ol>");
+			}
+			html.push(`<li>${inline(ordered.groups.text, page)}</li>`);
+			continue;
+		}
 
-    paragraph.push(line.trim());
-  }
+		paragraph.push(line.trim());
+	}
 
-  flushParagraph();
-  closeList();
-  return html.join("\n");
+	flushParagraph();
+	closeList();
+	return html.join("\n");
 }
 
 function inline(markdown: string, page: Page) {
-  let html = escapeHtml(markdown);
-  html = html.replaceAll(
-    /!\[(?<alt>[^\]]*)\]\((?<href>[^)]+)\)/gu,
-    (_match: string, alt: string, href: string) =>
-      `<img src="${escapeAttribute(rewriteLink(href, page))}" alt="${escapeAttribute(alt)}" />`,
-  );
-  html = html.replaceAll(
-    /\[(?<text>[^\]]+)\]\((?<href>[^)]+)\)/gu,
-    (_match: string, text: string, href: string) =>
-      `<a href="${escapeAttribute(rewriteLink(href, page))}">${text}</a>`,
-  );
-  html = html.replaceAll(
-    /`(?<code>[^`]+)`/gu,
-    (_match: string, code: string) => `<code>${code}</code>`,
-  );
-  html = html.replaceAll(/\*\*(?<text>[^*]+)\*\*/gu, "<strong>$<text></strong>");
-  return html;
+	let html = escapeHtml(markdown);
+	html = html.replaceAll(
+		/!\[(?<alt>[^\]]*)\]\((?<href>[^)]+)\)/gu,
+		(_match: string, alt: string, href: string) =>
+			`<img src="${escapeAttribute(rewriteLink(href, page))}" alt="${escapeAttribute(alt)}" />`,
+	);
+	html = html.replaceAll(
+		/\[(?<text>[^\]]+)\]\((?<href>[^)]+)\)/gu,
+		(_match: string, text: string, href: string) =>
+			`<a href="${escapeAttribute(rewriteLink(href, page))}">${text}</a>`,
+	);
+	html = html.replaceAll(
+		/`(?<code>[^`]+)`/gu,
+		(_match: string, code: string) => `<code>${code}</code>`,
+	);
+	html = html.replaceAll(/\*\*(?<text>[^*]+)\*\*/gu, "<strong>$<text></strong>");
+	return html;
 }
 
 function rewriteLink(rawHref: string, page: Page) {
-  if (/^[a-z][a-z0-9+.-]*:/iu.test(rawHref) || rawHref.startsWith("#")) {
-    return rawHref;
-  }
-  const [target, hash = ""] = rawHref.split("#");
-  if (target.endsWith(".md")) {
-    const targetPage = pageByRel.get(target);
-    if (!targetPage) {
-      throw new Error(`Broken docs link in ${page.rel}: ${rawHref}`);
-    }
-    return relativeLink(dirname(page.outRel), targetPage.outRel, hash);
-  }
-  if (target.startsWith("assets/")) {
-    return relativeLink(dirname(page.outRel), target, hash);
-  }
-  return relativeLink(dirname(page.outRel), `docs/${target}`, hash);
+	if (/^[a-z][a-z0-9+.-]*:/iu.test(rawHref) || rawHref.startsWith("#")) {
+		return rawHref;
+	}
+	const [target, hash = ""] = rawHref.split("#");
+	if (target.endsWith(".md")) {
+		const targetPage = pageByRel.get(target);
+		if (!targetPage) {
+			throw new Error(`Broken docs link in ${page.rel}: ${rawHref}`);
+		}
+		return relativeLink(dirname(page.outRel), targetPage.outRel, hash);
+	}
+	if (target.startsWith("assets/")) {
+		return relativeLink(dirname(page.outRel), target, hash);
+	}
+	return relativeLink(dirname(page.outRel), `docs/${target}`, hash);
 }
 
 function relativeLink(fromDir: string, toRel: string, hash: string) {
-  const link =
-    relative(fromDir === "." ? "" : fromDir, toRel).replaceAll(sep, "/") || basename(toRel);
-  return hash ? `${link}#${hash}` : link;
+	const link =
+		relative(fromDir === "." ? "" : fromDir, toRel).replaceAll(sep, "/") || basename(toRel);
+	return hash ? `${link}#${hash}` : link;
 }
 
 function layout(page: Page, html: string) {
-  return `<!doctype html>
+	return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -319,59 +319,59 @@ function layout(page: Page, html: string) {
 }
 
 function navHtml(current: Page) {
-  return nav
-    .map(([title, rels]) => {
-      const links = rels
-        .map((rel) => pageByRel.get(rel))
-        .filter((page): page is Page => page !== undefined)
-        .map((page) => {
-          const active = page.outRel === current.outRel ? " active" : "";
-          return `<a class="${active}" href="${relativeLink(dirname(current.outRel), page.outRel, "")}">${escapeHtml(page.title)}</a>`;
-        })
-        .join("");
-      return `<section><h2>${title}</h2>${links}</section>`;
-    })
-    .join("");
+	return nav
+		.map(([title, rels]) => {
+			const links = rels
+				.map((rel) => pageByRel.get(rel))
+				.filter((page): page is Page => page !== undefined)
+				.map((page) => {
+					const active = page.outRel === current.outRel ? " active" : "";
+					return `<a class="${active}" href="${relativeLink(dirname(current.outRel), page.outRel, "")}">${escapeHtml(page.title)}</a>`;
+				})
+				.join("");
+			return `<section><h2>${title}</h2>${links}</section>`;
+		})
+		.join("");
 }
 
 function copyAssets() {
-  const assetsDir = resolve(docsDir, "assets");
-  if (!existsSync(assetsDir)) {
-    return;
-  }
-  const outputAssets = resolve(outDir, "assets");
-  mkdirSync(outputAssets, { recursive: true });
-  for (const entry of readdirSync(assetsDir)) {
-    const source = resolve(assetsDir, entry);
-    if (statSync(source).isFile()) {
-      copyFileSync(source, resolve(outputAssets, entry));
-    }
-  }
+	const assetsDir = resolve(docsDir, "assets");
+	if (!existsSync(assetsDir)) {
+		return;
+	}
+	const outputAssets = resolve(outDir, "assets");
+	mkdirSync(outputAssets, { recursive: true });
+	for (const entry of readdirSync(assetsDir)) {
+		const source = resolve(assetsDir, entry);
+		if (statSync(source).isFile()) {
+			copyFileSync(source, resolve(outputAssets, entry));
+		}
+	}
 }
 
 function copyWorkbench() {
-  const index = readFileSync(resolve(playgroundDir, "index.html"), "utf8")
-    .replace("__PLAYGROUND_TOKEN__", "")
-    .replace("</head>", `${canonicalRedirectScript()}\n  </head>`)
-    .replace('href="/styles.css"', 'href="styles.css"')
-    .replace('href="/docs/"', 'href="docs/"')
-    .replace('src="/app.js"', 'src="app.js"');
-  writeFileSync(resolve(outDir, "index.html"), index, "utf8");
-  copyFileSync(resolve(compiledPlaygroundDir, "app.js"), resolve(outDir, "app.js"));
-  copyFileSync(resolve(compiledPlaygroundDir, "app.js.map"), resolve(outDir, "app.js.map"));
-  copyFileSync(
-    resolve(compiledPlaygroundDir, "ffmpac-worker.js"),
-    resolve(outDir, "ffmpac-worker.js"),
-  );
-  copyFileSync(
-    resolve(compiledPlaygroundDir, "ffmpac-worker.js.map"),
-    resolve(outDir, "ffmpac-worker.js.map"),
-  );
-  copyFileSync(resolve(playgroundDir, "styles.css"), resolve(outDir, "styles.css"));
+	const index = readFileSync(resolve(playgroundDir, "index.html"), "utf8")
+		.replace("__PLAYGROUND_TOKEN__", "")
+		.replace("</head>", `${canonicalRedirectScript()}\n  </head>`)
+		.replace('href="/styles.css"', 'href="styles.css"')
+		.replace('href="/docs/"', 'href="docs/"')
+		.replace('src="/app.js"', 'src="app.js"');
+	writeFileSync(resolve(outDir, "index.html"), index, "utf8");
+	copyFileSync(resolve(compiledPlaygroundDir, "app.js"), resolve(outDir, "app.js"));
+	copyFileSync(resolve(compiledPlaygroundDir, "app.js.map"), resolve(outDir, "app.js.map"));
+	copyFileSync(
+		resolve(compiledPlaygroundDir, "ffmpac-worker.js"),
+		resolve(outDir, "ffmpac-worker.js"),
+	);
+	copyFileSync(
+		resolve(compiledPlaygroundDir, "ffmpac-worker.js.map"),
+		resolve(outDir, "ffmpac-worker.js.map"),
+	);
+	copyFileSync(resolve(playgroundDir, "styles.css"), resolve(outDir, "styles.css"));
 }
 
 function canonicalRedirectScript() {
-  return `<script>
+	return `<script>
 (() => {
   const { hostname, pathname, search, hash } = window.location;
   if (hostname === "www.ffmpeg.sh") {
@@ -387,9 +387,9 @@ function canonicalRedirectScript() {
 }
 
 function writeRedirectFallback() {
-  writeFileSync(
-    resolve(outDir, "404.html"),
-    `<!doctype html>
+	writeFileSync(
+		resolve(outDir, "404.html"),
+		`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -402,92 +402,92 @@ function writeRedirectFallback() {
   </body>
 </html>
 `,
-    "utf8",
-  );
+		"utf8",
+	);
 }
 
 function copyBrowserWasm() {
-  if (!existsSync(browserDist)) {
-    if (allowMissingBrowserBundle) {
-      return;
-    }
-    throw new Error("Missing dist/browser. Run pnpm build before building deployable docs.");
-  }
-  for (const required of ["ffmpeg.js", "ffmpeg_g.wasm", "ffprobe.js", "ffprobe_g.wasm"]) {
-    if (!existsSync(resolve(browserDist, required))) {
-      throw new Error(`Missing dist/browser/${required}. Run pnpm build before building docs.`);
-    }
-  }
-  const outputWasm = resolve(outDir, "wasm");
-  mkdirSync(outputWasm, { recursive: true });
-  for (const name of [
-    "ffmpeg.js",
-    "ffmpeg.worker.js",
-    "ffmpeg_g",
-    "ffmpeg_g.wasm",
-    "ffprobe.js",
-    "ffprobe.worker.js",
-    "ffprobe_g",
-    "ffprobe_g.wasm",
-  ]) {
-    const source = resolve(browserDist, name);
-    if (existsSync(source)) {
-      copyFileSync(source, resolve(outputWasm, name));
-    }
-  }
-  copyGeneratedLicenses(outputWasm);
+	if (!existsSync(browserDist)) {
+		if (allowMissingBrowserBundle) {
+			return;
+		}
+		throw new Error("Missing dist/browser. Run pnpm build before building deployable docs.");
+	}
+	for (const required of ["ffmpeg.js", "ffmpeg_g.wasm", "ffprobe.js", "ffprobe_g.wasm"]) {
+		if (!existsSync(resolve(browserDist, required))) {
+			throw new Error(`Missing dist/browser/${required}. Run pnpm build before building docs.`);
+		}
+	}
+	const outputWasm = resolve(outDir, "wasm");
+	mkdirSync(outputWasm, { recursive: true });
+	for (const name of [
+		"ffmpeg.js",
+		"ffmpeg.worker.js",
+		"ffmpeg_g",
+		"ffmpeg_g.wasm",
+		"ffprobe.js",
+		"ffprobe.worker.js",
+		"ffprobe_g",
+		"ffprobe_g.wasm",
+	]) {
+		const source = resolve(browserDist, name);
+		if (existsSync(source)) {
+			copyFileSync(source, resolve(outputWasm, name));
+		}
+	}
+	copyGeneratedLicenses(outputWasm);
 }
 
 function copyGeneratedLicenses(outputDir: string) {
-  for (const name of [
-    "LICENSE.md",
-    "COPYING.LGPLv2.1",
-    "COPYING.LGPLv3",
-    "COPYING.GPLv2",
-    "COPYING.GPLv3",
-    "LICENSE.libvpx",
-    "PATENTS.libvpx",
-  ]) {
-    const source = resolve(distRoot(), name);
-    if (!existsSync(source)) {
-      throw new Error(`Missing dist/${name}. Run pnpm build before building docs.`);
-    }
-    copyFileSync(source, resolve(outputDir, name));
-  }
+	for (const name of [
+		"LICENSE.md",
+		"COPYING.LGPLv2.1",
+		"COPYING.LGPLv3",
+		"COPYING.GPLv2",
+		"COPYING.GPLv3",
+		"LICENSE.libvpx",
+		"PATENTS.libvpx",
+	]) {
+		const source = resolve(distRoot(), name);
+		if (!existsSync(source)) {
+			throw new Error(`Missing dist/${name}. Run pnpm build before building docs.`);
+		}
+		copyFileSync(source, resolve(outputDir, name));
+	}
 }
 
 function distRoot() {
-  return resolve(root, "dist");
+	return resolve(root, "dist");
 }
 
 async function writeSampleVideo() {
-  const samplePath = resolve(outDir, "sample.webm");
-  if (allowMissingBrowserBundle && !existsSync(resolve(distRoot(), "ffmpeg.js"))) {
-    console.warn("sample video skipped: wasm bundle unavailable");
-    return;
-  }
-  await generateSampleVideo(samplePath, { format: "webm" });
+	const samplePath = resolve(outDir, "sample.webm");
+	if (allowMissingBrowserBundle && !existsSync(resolve(distRoot(), "ffmpeg.js"))) {
+		console.warn("sample video skipped: wasm bundle unavailable");
+		return;
+	}
+	await generateSampleVideo(samplePath, { format: "webm" });
 }
 
 function llmsText() {
-  const lines = [
-    `# ${productName}`,
-    "",
-    tagline,
-    "",
-    "Documentation:",
-    ...pages.map(
-      (page) =>
-        `- ${page.title}: https://ffmpeg.sh/${page.outRel === "index.html" ? "" : page.outRel}`,
-    ),
-    "",
-    `Source: ${repoBase}`,
-  ];
-  return `${lines.join("\n")}\n`;
+	const lines = [
+		`# ${productName}`,
+		"",
+		tagline,
+		"",
+		"Documentation:",
+		...pages.map(
+			(page) =>
+				`- ${page.title}: https://ffmpeg.sh/${page.outRel === "index.html" ? "" : page.outRel}`,
+		),
+		"",
+		`Source: ${repoBase}`,
+	];
+	return `${lines.join("\n")}\n`;
 }
 
 function headersText() {
-  return `/*
+	return `/*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Resource-Policy: same-origin
@@ -508,34 +508,34 @@ function headersText() {
 }
 
 function firstHeading(markdown: string) {
-  return /^#\s+(?<title>.+)$/mu.exec(markdown)?.groups?.title.trim();
+	return /^#\s+(?<title>.+)$/mu.exec(markdown)?.groups?.title.trim();
 }
 
 function titleize(input: string) {
-  return input.replaceAll("-", " ").replaceAll(/\b\w/gu, (match) => match.toUpperCase());
+	return input.replaceAll("-", " ").replaceAll(/\b\w/gu, (match) => match.toUpperCase());
 }
 
 function slug(text: string) {
-  return text
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/gu, "-")
-    .replaceAll(/^-|-$/gu, "");
+	return text
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9]+/gu, "-")
+		.replaceAll(/^-|-$/gu, "");
 }
 
 function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+	return value
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;");
 }
 
 function escapeAttribute(value: string) {
-  return escapeHtml(value).replaceAll("'", "&#39;");
+	return escapeHtml(value).replaceAll("'", "&#39;");
 }
 
 function css() {
-  return `
+	return `
 :root{color-scheme:dark;--bg:#080a08;--panel:#111610;--panel-2:#151a14;--text:#f4f1e8;--muted:#a8ada0;--line:#283024;--accent:#b8e48c;--accent-2:#9cc7ff;--code:#060706}
 *{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;min-height:100vh;background:linear-gradient(180deg,#0b0e0b,#050605);color:var(--text);font:16px/1.65 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:grid;grid-template-columns:280px minmax(0,1fr)}
 body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(#000,transparent 85%)}
