@@ -185,31 +185,31 @@ The package also declares `ffmpeg-wasm` and `ffprobe-wasm` bin entries for downs
 import { execFfmpeg, runFfmpeg, runFfprobe } from "@steipete/ffmpeg-wasm-local";
 
 const probe = await runFfprobe([
-	"-v",
-	"error",
-	"-show_entries",
-	"format=duration",
-	"-of",
-	"default=noprint_wrappers=1:nokey=1",
-	"input.mp4",
+  "-v",
+  "error",
+  "-show_entries",
+  "format=duration",
+  "-of",
+  "default=noprint_wrappers=1:nokey=1",
+  "input.mp4",
 ]);
 
 if (probe.exitCode !== 0) throw new Error(probe.stderrText);
 
 const wav = await runFfmpeg([
-	"-hide_banner",
-	"-loglevel",
-	"error",
-	"-i",
-	"input.mp4",
-	"-vn",
-	"-ac",
-	"1",
-	"-ar",
-	"16000",
-	"-f",
-	"wav",
-	"-",
+  "-hide_banner",
+  "-loglevel",
+  "error",
+  "-i",
+  "input.mp4",
+  "-vn",
+  "-ac",
+  "1",
+  "-ar",
+  "16000",
+  "-f",
+  "wav",
+  "-",
 ]);
 
 await execFfmpeg(["-hide_banner", "-i", "input.mp4", "audio.mp3"]);
