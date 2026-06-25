@@ -17,17 +17,17 @@ Use `runFfmpeg` and `runFfprobe` when stdout and stderr should be buffered.
 
 ```ts
 const probe = await runFfprobe([
-	"-v",
-	"error",
-	"-show_entries",
-	"format=duration",
-	"-of",
-	"default=noprint_wrappers=1:nokey=1",
-	"input.mp4",
+  "-v",
+  "error",
+  "-show_entries",
+  "format=duration",
+  "-of",
+  "default=noprint_wrappers=1:nokey=1",
+  "input.mp4",
 ]);
 
 if (probe.exitCode !== 0) {
-	throw new Error(probe.stderrText);
+  throw new Error(probe.stderrText);
 }
 ```
 
@@ -39,19 +39,19 @@ Use `execFfmpeg` and `execFfprobe` for CLI-like execution.
 
 ```ts
 const result = await execFfmpeg([
-	"-hide_banner",
-	"-i",
-	"input.mp4",
-	"-vn",
-	"-ac",
-	"1",
-	"-ar",
-	"16000",
-	"audio.wav",
+  "-hide_banner",
+  "-i",
+  "input.mp4",
+  "-vn",
+  "-ac",
+  "1",
+  "-ar",
+  "16000",
+  "audio.wav",
 ]);
 
 if (result.exitCode !== 0) {
-	throw new Error("ffmpeg failed");
+  throw new Error("ffmpeg failed");
 }
 ```
 
