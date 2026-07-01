@@ -5,7 +5,7 @@
 ### Added
 
 - Added lightweight Node-focused FFmpeg and FFprobe WebAssembly package with a reproducible Emscripten build.
-- Added narrow LGPL FFmpeg build based on FFmpeg `n8.1.1`, with no GPL or nonfree configure flags.
+- Added narrow LGPL FFmpeg build based on FFmpeg `n8.1.2`, with no GPL or nonfree configure flags.
 - Added static LAME integration for MP3 output while keeping generated FFmpeg assets under LGPL terms.
 - Added static libvpx integration for a browser-compatible VP8/Opus WebM sample generated entirely by wasm.
 - Added CLI-compatible `ffmpeg-wasm` and `ffprobe-wasm` package binaries.

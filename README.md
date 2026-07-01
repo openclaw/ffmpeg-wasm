@@ -28,7 +28,7 @@ Keep wrapper code and generated FFmpeg binaries conceptually separate when this 
 
 Default refs:
 
-- FFmpeg: `n8.1.1`
+- FFmpeg: `n8.1.2`
 - LAME: `2badea1974ae36cb8312afe99cff1e6b3b5decee` from `ffmpegwasm/lame`
 - libvpx: `v1.16.0`
 - Runtime: Node 24+
@@ -251,7 +251,7 @@ For direct package usage, import the TypeScript API and keep `dist/` next to the
 Override source refs per build:
 
 ```sh
-FFMPEG_VERSION=n8.1.1 LAME_REF=2badea1974ae36cb8312afe99cff1e6b3b5decee LIBVPX_REF=v1.16.0 pnpm build
+FFMPEG_VERSION=n8.1.2 LAME_REF=2badea1974ae36cb8312afe99cff1e6b3b5decee LIBVPX_REF=v1.16.0 pnpm build
 ```
 
 To keep the binary small, only add codecs, demuxers, muxers, filters, or protocols when a real caller needs them. Prefer adding one capability and extending `scripts/verify.ts` with a matching proof.

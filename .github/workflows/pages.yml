@@ -29,16 +29,17 @@ jobs:
     timeout-minutes: 60
     env:
       EM_CACHE: ${{ github.workspace }}/.cache/emcache
-      FFMPEG_VERSION: n8.1.1
+      EMSDK_VERSION: 6.0.1
+      FFMPEG_VERSION: n8.1.2
       LAME_REF: 2badea1974ae36cb8312afe99cff1e6b3b5decee
       LIBVPX_REF: v1.16.0
       HAS_CLOUDFLARE_DEPLOY: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' && secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           version: 10.33.2
 
@@ -65,13 +66,13 @@ jobs:
             yasm
 
       - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
+        uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
         with:
-          version: 4.0.23
+          version: ${{ env.EMSDK_VERSION }}
           actions-cache-folder: emsdk-cache
 
       - name: Restore build cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             .cache/FFmpeg
@@ -79,10 +80,10 @@ jobs:
             .cache/lame
             .cache/libvpx
             .cache/emcache
-          key: pages-wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ env.LAME_REF }}-${{ env.LIBVPX_REF }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
+          key: pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-${{ env.FFMPEG_VERSION }}-${{ env.LAME_REF }}-${{ env.LIBVPX_REF }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
           restore-keys: |
-            pages-wasm-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-
-            pages-wasm-${{ runner.os }}-
+            pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-${{ env.FFMPEG_VERSION }}-
+            pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-
 
       - name: Build deployable site
         run: pnpm docs:build
