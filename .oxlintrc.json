@@ -45,6 +45,7 @@
     "no-ternary": "off",
     "no-undefined": "off",
     "no-use-before-define": "off",
+    "node/no-sync": "off",
     "prefer-destructuring": "off",
     "node/no-process-env": "off",
     "oxc/no-async-await": "off",

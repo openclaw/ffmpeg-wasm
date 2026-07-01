@@ -216,11 +216,7 @@ try {
       if (audioState.lastRender.bytes <= 1000 || !audioState.outputAudio) {
         throw new Error(`Unexpected audio render result: ${JSON.stringify(audioState)}`);
       }
-      const screenshot = await cdp.send("Page.captureScreenshot", {
-        captureBeyondViewport: true,
-        format: "png",
-      });
-      await writeFile(screenshotPath, Buffer.from(asStringField(screenshot, "data"), "base64"));
+      await writeFile(screenshotPath, await captureFullPageScreenshot(cdp));
       console.log(
         `playground e2e ok (${mode}, ${videoState.lastRender.name}, ${audioState.lastRender.name})`,
       );
@@ -422,12 +418,44 @@ async function writeFailureState(cdp: CdpClient) {
   const value = state.result?.value;
   const renderedState = typeof value === "string" ? value : JSON.stringify(value ?? "");
   console.error(`playground e2e state: ${renderedState}`);
+  await writeFile(screenshotPath, await captureFullPageScreenshot(cdp));
+  console.error(`screenshot: ${screenshotPath}`);
+}
+
+async function captureFullPageScreenshot(cdp: CdpClient) {
+  // Chrome can replace a full-page capture with only the hardware video plane.
+  await runtimeEvaluate(
+    cdp,
+    `(async () => {
+      const images = [];
+      for (const video of document.querySelectorAll("video")) {
+        const rect = video.getBoundingClientRect();
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(rect.width));
+        canvas.height = Math.max(1, Math.round(rect.height));
+        const context = canvas.getContext("2d");
+        if (context && video.videoWidth > 0 && video.videoHeight > 0) {
+          const scale = Math.min(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
+          const width = video.videoWidth * scale;
+          const height = video.videoHeight * scale;
+          context.drawImage(video, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+        }
+        const image = document.createElement("img");
+        image.src = canvas.toDataURL("image/png");
+        image.style.cssText = \`display:block;width:\${canvas.width}px;height:\${canvas.height}px;max-width:100%;background:#050605\`;
+        video.replaceWith(image);
+        images.push(image.decode());
+      }
+      await Promise.all(images);
+      scrollTo(0, 0);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    })()`,
+  );
   const screenshot = await cdp.send("Page.captureScreenshot", {
     captureBeyondViewport: true,
     format: "png",
   });
-  await writeFile(screenshotPath, Buffer.from(asStringField(screenshot, "data"), "base64"));
-  console.error(`screenshot: ${screenshotPath}`);
+  return Buffer.from(asStringField(screenshot, "data"), "base64");
 }
 
 async function connectToPlayground(debugPort: number) {
