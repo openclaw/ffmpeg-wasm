@@ -19,7 +19,7 @@
     "build": "pnpm compile && node lib/scripts/build.js",
     "check": "pnpm compile && pnpm lint && pnpm docs:build:compiled --allow-missing-browser && pnpm format:check",
     "clean": "rimraf dist lib .cache/build",
-    "compile": "tsgo -p tsconfig.json && chmod +x lib/src/cli.js lib/src/ffprobe-cli.js lib/src/run-generated.js lib/scripts/build.js lib/scripts/build-docs-site.js lib/scripts/playground-e2e.js lib/scripts/playground-server.js lib/scripts/verify.js",
+    "compile": "tsc -p tsconfig.json && chmod +x lib/src/cli.js lib/src/ffprobe-cli.js lib/src/run-generated.js lib/scripts/build.js lib/scripts/build-docs-site.js lib/scripts/playground-e2e.js lib/scripts/playground-server.js lib/scripts/verify.js",
     "docs:build": "pnpm build && pnpm docs:build:compiled",
     "docs:build:compiled": "node lib/scripts/build-docs-site.js",
     "format": "oxfmt --write .",
@@ -31,13 +31,13 @@
     "verify": "pnpm compile && node lib/scripts/verify.js"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
-    "@typescript/native-preview": "7.0.0-dev.20260701.1",
-    "oxfmt": "^0.57.0",
-    "oxlint": "^1.72.0",
+    "@types/node": "^26.1.1",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
     "oxlint-tsgolint": "^0.24.0",
     "rimraf": "^6.1.3",
-    "wrangler": "4.106.0"
+    "typescript": "^7.0.2",
+    "wrangler": "4.107.1"
   },
   "engines": {
     "node": ">=24"

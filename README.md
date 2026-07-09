@@ -163,7 +163,7 @@ pnpm check
 
 `pnpm test:e2e` rebuilds the wasm assets from source, then runs the same live verifier against the generated FFmpeg/FFprobe wrappers.
 
-`pnpm check` runs `tsgo`, strict `oxlint`, and `oxfmt --check`.
+`pnpm check` runs `tsc`, strict `oxlint`, and `oxfmt --check`.
 
 ## CLI
 

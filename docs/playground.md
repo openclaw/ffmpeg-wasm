@@ -48,4 +48,4 @@ The workbench is a ffmpac test surface. It does not use browser-native media enc
 
 The playground server binds to `127.0.0.1` and protects render APIs with a per-server request token embedded into the served page. Cross-origin pages cannot trigger uploads or FFmpeg work without that token.
 
-The browser client and ffmpac worker are written in TypeScript and compiled by `pnpm compile`, so `tsgo`, `oxlint`, and `oxfmt` cover the workbench code.
+The browser client and ffmpac worker are written in TypeScript and compiled by `pnpm compile`, so `tsc`, `oxlint`, and `oxfmt` cover the workbench code.

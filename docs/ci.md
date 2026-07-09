@@ -14,7 +14,7 @@ pnpm playground:e2e
 PLAYGROUND_E2E_STATIC=1 pnpm playground:e2e
 ```
 
-`pnpm check` runs `tsgo`, strict type-aware `oxlint`, and `oxfmt --check`.
+`pnpm check` runs `tsc`, strict type-aware `oxlint`, and `oxfmt --check`.
 
 `pnpm test:e2e` rebuilds FFmpeg and FFprobe from source, then runs live verifier coverage against the generated wasm assets with external executable lookup disabled. Set `FFMPEG_WASM_VERIFY_OUTPUT_DIR` to retain converted media and a JSON proof manifest.
 
