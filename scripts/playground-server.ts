@@ -414,6 +414,9 @@ async function sendFile(
 }
 
 function sendError(response: ServerResponse, error: unknown) {
+  if (!(error instanceof HttpError)) {
+    console.error("Playground request failed", error);
+  }
   if (response.headersSent) {
     response.end();
     return;
@@ -423,9 +426,10 @@ function sendError(response: ServerResponse, error: unknown) {
     response.end(JSON.stringify({ error: error.message }, null, 2));
     return;
   }
-  const message = error instanceof Error ? error.message : String(error);
   response.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify({ error: message }, null, 2));
+  response.end(
+    JSON.stringify({ error: "Playground request failed; see server log for details." }, null, 2),
+  );
 }
 
 function sendIndex(response: ServerResponse) {

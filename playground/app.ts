@@ -371,7 +371,7 @@ async function setSourceFile(file: File) {
   if (state.inputUrl !== null) {
     URL.revokeObjectURL(state.inputUrl);
   }
-  state.inputUrl = URL.createObjectURL(file);
+  state.inputUrl = createBlobUrl(file);
   elements.sourceTitle.textContent = file.name;
   elements.outputTitle.textContent = "Waiting";
   elements.saveButton.disabled = true;
@@ -466,7 +466,7 @@ function setLastOutput(output: RenderOutput) {
   if (state.lastOutput?.url !== undefined) {
     URL.revokeObjectURL(state.lastOutput.url);
   }
-  const url = URL.createObjectURL(output.blob);
+  const url = createBlobUrl(output.blob);
   state.lastOutput = { ...output, url };
   elements.outputTitle.textContent = output.name;
   elements.saveButton.disabled = false;
@@ -551,6 +551,16 @@ function mediaElement(type: string, url: string, label: string): HTMLElement {
     state.lastOutput?.blob.size ?? 0,
   )}</span>`;
   return block;
+}
+
+function createBlobUrl(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  // DOM URL sinks only receive opaque browser-issued blob URLs.
+  if (!url.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+    throw new Error("Browser returned an invalid object URL");
+  }
+  return encodeURI(url);
 }
 
 function bindSourceVideo(video: HTMLVideoElement) {
@@ -1112,7 +1122,7 @@ async function writeBlobToHandle(handle: BrowserFileHandle, blob: Blob) {
 }
 
 function downloadBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
+  const url = createBlobUrl(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = name;
