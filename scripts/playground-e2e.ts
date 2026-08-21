@@ -140,9 +140,8 @@ const server = staticMode ? startStaticServer() : startPlaygroundServer();
 try {
   await waitForServer(server);
   await assertHostGuard(staticMode);
-  if (staticMode) {
-    await assertStaticMode();
-  }
+  const modeAssertion = staticMode ? assertStaticMode : assertInternalErrorsRedacted;
+  await modeAssertion();
   const profileDir = await mkdtemp(join(tmpdir(), "ffmpeg-wasm-chrome-"));
   const chromeArgs = [
     `--remote-debugging-port=${Number(port) + 10}`,
@@ -170,6 +169,7 @@ try {
         "document.querySelector('[data-testid=status-text]')?.textContent.trim() === 'Ready'",
         180_000,
       );
+      await waitFor(cdp, "document.querySelector('#sourceViewer video')?.src.startsWith('blob:')");
       await waitFor(
         cdp,
         "document.querySelector('[data-testid=preset-video-mp4]')?.classList.contains('active') && document.querySelector('[data-testid=command-preview]')?.value.includes('-c:v mpeg4')",
@@ -205,7 +205,11 @@ try {
       if (staticMode && videoState.lastProgress.value !== "100%") {
         throw new Error(`Missing video progress state: ${JSON.stringify(videoState.lastProgress)}`);
       }
-      if (!videoState.outputVideo || videoState.status !== "Rendered") {
+      if (
+        !videoState.outputVideo ||
+        !videoState.outputSource.startsWith("blob:") ||
+        videoState.status !== "Rendered"
+      ) {
         throw new Error(`Unexpected video UI state: ${JSON.stringify(videoState)}`);
       }
       await clickSelector(cdp, "[data-testid=preset-audio-mp3]");
@@ -213,8 +217,20 @@ try {
       await clickSelector(cdp, "[data-testid=render-button]");
       await waitFor(cdp, "globalThis.__lastRender?.operation === 'audio-mp3'", 120_000);
       const audioState = await readState(cdp);
-      if (audioState.lastRender.bytes <= 1000 || !audioState.outputAudio) {
+      if (
+        audioState.lastRender.bytes <= 1000 ||
+        !audioState.outputAudio ||
+        !audioState.outputSource.startsWith("blob:")
+      ) {
         throw new Error(`Unexpected audio render result: ${JSON.stringify(audioState)}`);
+      }
+      await clickSelector(cdp, "[data-testid=preset-poster-png]");
+      await cdp.send("Runtime.evaluate", { expression: "delete globalThis.__lastRender" });
+      await clickSelector(cdp, "[data-testid=render-button]");
+      await waitFor(cdp, "globalThis.__lastRender?.operation === 'poster-png'", 120_000);
+      const imageState = await readState(cdp);
+      if (!imageState.outputImage || !imageState.outputSource.startsWith("blob:")) {
+        throw new Error(`Unexpected image render result: ${JSON.stringify(imageState)}`);
       }
       await writeFile(screenshotPath, await captureFullPageScreenshot(cdp));
       console.log(
@@ -393,6 +409,43 @@ async function assertStaticMode() {
   }
 }
 
+async function assertInternalErrorsRedacted() {
+  const result = await new Promise<{ body: string; status: number }>((resolvePromise, reject) => {
+    const request = httpRequest(
+      {
+        headers: {
+          Host: "[",
+        },
+        host: "127.0.0.1",
+        method: "GET",
+        path: "/",
+        port: Number(port),
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+        response.on("end", () => {
+          resolvePromise({
+            body: Buffer.concat(chunks).toString("utf8"),
+            status: response.statusCode ?? 0,
+          });
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end();
+  });
+  const parsed = asRecord(parseJson(result.body));
+  if (
+    result.status !== 500 ||
+    parsed.error !== "Playground request failed; see server log for details."
+  ) {
+    throw new Error(`Unexpected internal error response: ${JSON.stringify(result)}`);
+  }
+}
+
 async function responseStatus(path: string) {
   const response = await fetch(`${baseUrl}${path}`);
   await response.body?.cancel();
@@ -500,6 +553,8 @@ async function readState(cdp: CdpClient) {
       outputTitle: document.querySelector('[data-testid=output-title]').textContent,
       outputMetrics: document.querySelector('[data-testid=output-metrics]').textContent,
       outputAudio: !!document.querySelector('[data-testid=output-viewer] audio'),
+      outputImage: !!document.querySelector('[data-testid=output-viewer] img'),
+      outputSource: document.querySelector('[data-testid=output-viewer] video, [data-testid=output-viewer] audio, [data-testid=output-viewer] img')?.src ?? "",
       outputVideo: !!document.querySelector('[data-testid=output-viewer] video'),
       lastProgress: globalThis.__lastProgress,
       lastRender: globalThis.__lastRender
@@ -514,6 +569,8 @@ async function readState(cdp: CdpClient) {
     lastProgress: asProgressState(parsed.lastProgress),
     lastRender: asRenderState(parsed.lastRender),
     outputAudio: parsed.outputAudio === true,
+    outputImage: parsed.outputImage === true,
+    outputSource: asString(parsed.outputSource),
     outputTitle: asString(parsed.outputTitle),
     outputVideo: parsed.outputVideo === true,
     status: asString(parsed.status),
