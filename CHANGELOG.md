@@ -2,6 +2,11 @@
 
 ## 0.1.0 - Unreleased
 
+### Changed
+
+- Updated pnpm to 11.24, Node types, formatting, type-aware linting, Wrangler, and pinned GitHub Actions while preserving the 48-hour package release delay and disabled dependency build scripts.
+- Updated FFmpeg to `n9.0.1` and libvpx to `v1.17.0` while retaining Emscripten `6.0.1` for stdin compatibility.
+
 ### Added
 
 - Added lightweight Node-focused FFmpeg and FFprobe WebAssembly package with a reproducible Emscripten build.
@@ -36,4 +41,4 @@
 - Added GitHub Actions CI for quality checks and full live wasm E2E on Node 24 with Emscripten, build caching, and `dist` artifact upload.
 - Added CI conversion proof artifacts, explicit CLI MP4/MP3 transcoding, codec and dimension assertions, native executable auditing, separate server/static browser screenshots, and reliable browser-process teardown.
 - Added Cloudflare Pages deployment workflow so the static workbench ships with the COOP/COEP headers required by browser ffmpac.
-- Verified each generated Node or browser FFmpeg/FFprobe bundle at about 8.5 MB.
+- Verified generated Node and browser FFmpeg/FFprobe files at about 4.5–4.7 MB per tool.
