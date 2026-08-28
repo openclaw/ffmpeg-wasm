@@ -28,11 +28,11 @@ Keep wrapper code and generated FFmpeg binaries conceptually separate when this 
 
 Default refs:
 
-- FFmpeg: `n8.1.2`
+- FFmpeg: `n9.0.1`
 - LAME: `2badea1974ae36cb8312afe99cff1e6b3b5decee` from `ffmpegwasm/lame`
-- libvpx: `v1.16.0`
+- libvpx: `v1.17.0`
 - Runtime: Node 24+
-- Compiler: Emscripten via `emcc`
+- Compiler: Emscripten 6.0.1 via `emcc`
 
 Enabled programs:
 
@@ -119,7 +119,7 @@ External libraries:
 - `libvpx`
 - `zlib`
 
-Each generated Node or browser FFmpeg/FFprobe bundle is about 8.5 MB on current builds.
+Generated Node and browser FFmpeg/FFprobe files total about 4.5–4.7 MB per tool on current builds.
 
 ## Install
 
@@ -129,7 +129,7 @@ pnpm install
 
 Required system tools for a full wasm build:
 
-- Emscripten SDK with `emcc`, `em++`, `emar`, and `emranlib` on `PATH`
+- Emscripten SDK 6.0.1 with `emcc`, `em++`, `emar`, and `emranlib` on `PATH`
 - Autotools for LAME
 - `make`, `pkg-config`, `nasm`, `yasm`
 
@@ -251,7 +251,7 @@ For direct package usage, import the TypeScript API and keep `dist/` next to the
 Override source refs per build:
 
 ```sh
-FFMPEG_VERSION=n8.1.2 LAME_REF=2badea1974ae36cb8312afe99cff1e6b3b5decee LIBVPX_REF=v1.16.0 pnpm build
+FFMPEG_VERSION=n9.0.1 LAME_REF=2badea1974ae36cb8312afe99cff1e6b3b5decee LIBVPX_REF=v1.17.0 pnpm build
 ```
 
 To keep the binary small, only add codecs, demuxers, muxers, filters, or protocols when a real caller needs them. Prefer adding one capability and extending `scripts/verify.ts` with a matching proof.
