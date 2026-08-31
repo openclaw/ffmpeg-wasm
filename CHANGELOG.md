@@ -9,7 +9,7 @@
 
 ### Fixed
 
-- Handle EPIPE when writing ffmpeg stdin after the child exits, so the Node process no longer crashes with an unhandled stream error.
+- Handle EPIPE when writing ffmpeg stdin after the child exits, so the Node process no longer crashes with an unhandled stream error. Thanks @SebTardif.
 
 ### Added
 
