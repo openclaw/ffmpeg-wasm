@@ -13,5 +13,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "playground/**/*.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "playground/**/*.ts", "test/**/*.ts"]
 }

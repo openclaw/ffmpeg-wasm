@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build": "pnpm compile && node lib/scripts/build.js",
-    "check": "pnpm compile && pnpm lint && pnpm docs:build:compiled --allow-missing-browser && pnpm format:check",
+    "check": "pnpm compile && pnpm test && pnpm lint && pnpm docs:build:compiled --allow-missing-browser && pnpm format:check",
     "clean": "rimraf dist lib .cache/build",
     "compile": "tsc -p tsconfig.json && chmod +x lib/src/cli.js lib/src/ffprobe-cli.js lib/src/run-generated.js lib/scripts/build.js lib/scripts/build-docs-site.js lib/scripts/playground-e2e.js lib/scripts/playground-server.js lib/scripts/verify.js",
     "docs:build": "pnpm build && pnpm docs:build:compiled",
@@ -27,6 +27,7 @@
     "lint": "oxlint --tsconfig tsconfig.json --deny-warnings .",
     "playground": "pnpm compile && node lib/scripts/playground-server.js",
     "playground:e2e": "pnpm compile && node lib/scripts/playground-e2e.js",
+    "test": "node --test lib/test/**/*.test.js",
     "test:e2e": "pnpm build && pnpm verify",
     "verify": "pnpm compile && node lib/scripts/verify.js"
   },

@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { endChildStdin } from "./end-stdin.js";
 
 const here = import.meta.dirname;
 const root = resolve(here, "..", "..");
@@ -142,8 +143,8 @@ function spawnTool(
     child.stderr.on("data", (chunk: Buffer) => {
       stderr.push(chunk);
     });
-    if (hasStdin) {
-      child.stdin?.end(options.stdin);
+    if (options.stdin !== undefined) {
+      endChildStdin(child.stdin, options.stdin, finishReject);
     }
     child.on("error", (error) => {
       finishReject(error);
@@ -220,8 +221,8 @@ function spawnToolStreaming(
     child.on("error", (error) => {
       finishReject(error);
     });
-    if (hasStdin) {
-      child.stdin?.end(options.stdin);
+    if (options.stdin !== undefined) {
+      endChildStdin(child.stdin, options.stdin, finishReject);
     }
     child.on("close", (code, signal) => {
       if (timedOut) {
