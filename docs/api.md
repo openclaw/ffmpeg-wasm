@@ -63,6 +63,7 @@ All APIs accept:
 - `cwd` and `env` for process isolation.
 - `stdin` for pipe input.
 - `stdinMode` for binary or text input.
-- `timeoutMs` for bounded work.
+- `timeoutMs` to override the 20s default on buffered `runFfmpeg` / `runFfprobe` (pass `0` for no limit). Streaming `execFfmpeg` / `execFfprobe` still treat timeout as opt-in.
+- `maxProcessBufferBytes` to raise the 1 MiB stdout/stderr capture cap on buffered runs.
 
 FFmpeg receives `-nostdin` automatically unless the caller already supplies it. Explicit `-i -` pipe workflows still work.

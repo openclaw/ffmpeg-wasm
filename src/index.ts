@@ -8,6 +8,8 @@ const root = resolve(here, "..", "..");
 const defaultDist = resolve(root, "dist");
 const runner = resolve(here, "run-generated.js");
 const forcedKillDelayMs = 5000;
+export const defaultTimeoutMs = 20_000;
+export const maxProcessBufferBytes = 1024 * 1024;
 
 export type Tool = "ffmpeg" | "ffprobe";
 
@@ -18,6 +20,7 @@ export interface RunOptions {
   stdin?: Buffer | Uint8Array | string;
   stdinMode?: "ignore" | "inherit";
   timeoutMs?: number;
+  maxProcessBufferBytes?: number;
 }
 
 export interface RunResult {
@@ -95,20 +98,24 @@ function spawnTool(
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
+    const timeoutMs = resolveTimeoutMs(options.timeoutMs);
+    const bufferLimit = resolveBufferLimit(options.maxProcessBufferBytes);
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
     let settled = false;
     let forceKill: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const timeout =
-      options.timeoutMs === undefined
+      timeoutMs === undefined
         ? undefined
         : setTimeout(() => {
             timedOut = true;
             child.kill("SIGTERM");
             forceKill = setTimeout(() => {
               child.kill("SIGKILL");
-              finishReject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
+              finishReject(new Error(`${tool} wasm timed out after ${timeoutMs}ms`));
             }, forcedKillDelayMs);
-          }, options.timeoutMs);
+          }, timeoutMs);
     const cleanup = () => {
       if (timeout) {
         clearTimeout(timeout);
@@ -137,10 +144,26 @@ function spawnTool(
       finishReject(new Error(`Failed to capture ${tool} wasm stdio`));
       return;
     }
+    const rejectOverflow = (stream: "stdout" | "stderr") => {
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      child.kill("SIGKILL");
+      finishReject(new Error(`${tool} wasm ${stream} exceeded ${String(bufferLimit)} bytes`));
+    };
     child.stdout.on("data", (chunk: Buffer) => {
+      stdoutBytes += chunk.length;
+      if (bufferLimit !== undefined && stdoutBytes > bufferLimit) {
+        rejectOverflow("stdout");
+        return;
+      }
       stdout.push(chunk);
     });
     child.stderr.on("data", (chunk: Buffer) => {
+      stderrBytes += chunk.length;
+      if (bufferLimit !== undefined && stderrBytes > bufferLimit) {
+        rejectOverflow("stderr");
+        return;
+      }
       stderr.push(chunk);
     });
     if (options.stdin !== undefined) {
@@ -151,7 +174,7 @@ function spawnTool(
     });
     child.on("close", (code, signal) => {
       if (timedOut) {
-        finishReject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
+        finishReject(new Error(`${tool} wasm timed out after ${timeoutMs}ms`));
         return;
       }
       finishResolve({
@@ -283,6 +306,26 @@ function normalizeArgs(tool: Tool, args: string[]): string[] {
     return args;
   }
   return ["-nostdin", ...args];
+}
+
+function resolveTimeoutMs(timeoutMs: number | undefined): number | undefined {
+  if (timeoutMs === undefined) {
+    return defaultTimeoutMs;
+  }
+  if (timeoutMs <= 0) {
+    return undefined;
+  }
+  return timeoutMs;
+}
+
+function resolveBufferLimit(maxBytes: number | undefined): number | undefined {
+  if (maxBytes === undefined) {
+    return maxProcessBufferBytes;
+  }
+  if (maxBytes <= 0) {
+    return undefined;
+  }
+  return maxBytes;
 }
 
 function toError(error: unknown): Error {

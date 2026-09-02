@@ -224,7 +224,8 @@ Both APIs accept:
 - `distDir` to point at a custom generated asset directory.
 - `cwd` and `env` for process isolation.
 - `stdin` for pipe input.
-- `timeoutMs` for opt-in time limits.
+- `timeoutMs` to override the 20s default on buffered `runFfmpeg` / `runFfprobe` (pass `0` for no limit). Streaming `execFfmpeg` / `execFfprobe` still treat timeout as opt-in.
+- `maxProcessBufferBytes` to raise the 1 MiB stdout/stderr capture cap on buffered runs.
 
 `ffmpeg` receives `-nostdin` automatically unless the caller already supplied it. Explicit `-i -` stdin input still works through the wrapper.
 

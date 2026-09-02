@@ -10,6 +10,7 @@
 ### Fixed
 
 - Handle EPIPE when writing ffmpeg stdin after the child exits, so the Node process no longer crashes with an unhandled stream error. Thanks @SebTardif.
+- Cap buffered `runFfmpeg` / `runFfprobe` stdout and stderr at 1 MiB and default a 20s timeout so a verbose or stuck wasm process cannot grow the Node heap without bound. Thanks @SebTardif.
 
 ### Added
 
