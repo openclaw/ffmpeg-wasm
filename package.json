@@ -32,16 +32,16 @@
     "verify": "pnpm compile && node lib/scripts/verify.js"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
-    "oxfmt": "^0.65.0",
+    "@types/node": "^26.4.1",
+    "oxfmt": "^0.66.0",
     "oxlint": "1.73.0",
     "oxlint-tsgolint": "^7.0.2001",
     "rimraf": "^6.1.3",
     "typescript": "^7.0.2",
-    "wrangler": "4.127.1"
+    "wrangler": "4.128.0"
   },
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@11.24.0"
+  "packageManager": "pnpm@11.25.0"
 }

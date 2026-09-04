@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Updated pnpm to 11.25, Node types to 26.4.1, oxfmt to 0.66, and Wrangler to 4.128 while retaining the 48-hour package release delay and Node 24 runtime floor.
 - Updated pnpm to 11.24, Node types, formatting, type-aware linting, Wrangler, and pinned GitHub Actions while preserving the 48-hour package release delay and disabled dependency build scripts.
 - Updated FFmpeg to `n9.0.1` and libvpx to `v1.17.0` while retaining Emscripten `6.0.1` for stdin compatibility.
 
