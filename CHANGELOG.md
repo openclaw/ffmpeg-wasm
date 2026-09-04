@@ -10,6 +10,7 @@
 ### Fixed
 
 - Handle EPIPE when writing ffmpeg stdin after the child exits, so the Node process no longer crashes with an unhandled stream error. Thanks @SebTardif.
+- Ignore EPIPE on run-generated stdout and stderr writes so piping the CLI to a short consumer such as `head` no longer kills Node. Thanks @SebTardif.
 
 ### Added
 

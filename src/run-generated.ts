@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { ignoreStdioEpipe } from "./ignore-stdio-epipe.js";
+
+ignoreStdioEpipe(process.stdout);
+ignoreStdioEpipe(process.stderr);
 
 interface EmscriptenExitStatus {
   name?: string;
