@@ -163,6 +163,8 @@ pnpm check
 
 `pnpm test:e2e` rebuilds the wasm assets from source, then runs the same live verifier against the generated FFmpeg/FFprobe wrappers.
 
+On macOS and Linux, `pnpm verify` also sends real OS signals while wasm is reading stdin: both streaming APIs preserve application-owned cancellation, and both CLIs forward SIGHUP, SIGINT, and SIGTERM.
+
 `pnpm check` runs `tsc`, strict `oxlint`, and `oxfmt --check`.
 
 ## CLI

@@ -29,7 +29,7 @@
     "playground:e2e": "pnpm compile && node lib/scripts/playground-e2e.js",
     "test": "node --test lib/test/**/*.test.js",
     "test:e2e": "pnpm build && pnpm verify",
-    "verify": "pnpm compile && node lib/scripts/verify.js"
+    "verify": "pnpm compile && node lib/scripts/verify.js && node lib/scripts/verify-signals.js"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
