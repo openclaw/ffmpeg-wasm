@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 - Unreleased
+## 0.1.0 - 2026-09-05
 
 **Highlights:** Lightweight FFmpeg and FFprobe WebAssembly for Node 24+, with CLI and TypeScript APIs plus the browser-only media workbench at `ffmpeg.sh`.
 

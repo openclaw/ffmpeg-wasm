@@ -1,6 +1,6 @@
 {
   "name": "@steipete/ffmpeg-wasm-local",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Local lightweight FFmpeg/FFprobe WebAssembly build for browser and Node media workflows.",
   "license": "MIT",
