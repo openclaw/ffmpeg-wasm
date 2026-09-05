@@ -64,5 +64,6 @@ All APIs accept:
 - `stdin` for pipe input.
 - `stdinMode` for binary or text input.
 - `timeoutMs` for bounded work.
+- `onSpawn` for the spawned child. The package CLIs use this to forward host signals.
 
 FFmpeg receives `-nostdin` automatically unless the caller already supplies it. Explicit `-i -` pipe workflows still work.

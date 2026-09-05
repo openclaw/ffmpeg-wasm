@@ -18,6 +18,7 @@ export interface RunOptions {
   stdin?: Buffer | Uint8Array | string;
   stdinMode?: "ignore" | "inherit";
   timeoutMs?: number;
+  onSpawn?: (child: ChildProcess) => void;
 }
 
 export interface RunResult {
@@ -93,6 +94,7 @@ function spawnTool(
       env: options.env ?? process.env,
       stdio: [hasStdin ? "pipe" : (options.stdinMode ?? "ignore"), "pipe", "pipe"],
     });
+    options.onSpawn?.(child);
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let settled = false;
@@ -178,7 +180,7 @@ function spawnToolStreaming(
       env: options.env ?? process.env,
       stdio: [hasStdin ? "pipe" : (options.stdinMode ?? "inherit"), "inherit", "inherit"],
     });
-    const cleanupSignals = forwardProcessSignals(child);
+    options.onSpawn?.(child);
     let settled = false;
     let forceKill: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
@@ -194,7 +196,6 @@ function spawnToolStreaming(
             }, forcedKillDelayMs);
           }, options.timeoutMs);
     const cleanup = () => {
-      cleanupSignals();
       if (timeout) {
         clearTimeout(timeout);
       }
@@ -233,33 +234,6 @@ function spawnToolStreaming(
     });
   });
 }
-
-function forwardProcessSignals(child: ChildProcess) {
-  const listeners = forwardedSignals.map((signal) => {
-    let forceExit: ReturnType<typeof setTimeout> | undefined;
-    const listener = () => {
-      child.kill(signal);
-      forceExit ??= setTimeout(() => {
-        child.kill("SIGKILL");
-        process.exit(128 + signalNumber(signal));
-      }, 5000);
-    };
-    process.once(signal, listener);
-    return () => {
-      if (forceExit) {
-        clearTimeout(forceExit);
-      }
-      process.off(signal, listener);
-    };
-  });
-  return () => {
-    for (const cleanup of listeners) {
-      cleanup();
-    }
-  };
-}
-
-const forwardedSignals = ["SIGHUP", "SIGINT", "SIGTERM"] as const;
 
 function signalExitCode(signal: NodeJS.Signals | null) {
   return signal ? 128 + signalNumber(signal) : 1;
