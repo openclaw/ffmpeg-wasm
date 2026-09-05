@@ -3,4 +3,5 @@ dist/
 lib/
 .cache/
 .tmp/
+.wrangler/
 *.log
