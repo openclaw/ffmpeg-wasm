@@ -18,6 +18,8 @@ PLAYGROUND_E2E_STATIC=1 pnpm playground:e2e
 
 `pnpm test:e2e` rebuilds FFmpeg and FFprobe from source, then runs live verifier coverage against the generated wasm assets with external executable lookup disabled. Set `FFMPEG_WASM_VERIFY_OUTPUT_DIR` to retain converted media and a JSON proof manifest.
 
+On macOS and Linux, the verifier also blocks the real wasm tools on stdin and sends OS signals. It checks application-owned SIGTERM cancellation through both streaming APIs and SIGHUP/SIGINT/SIGTERM forwarding through both CLI entrypoints.
+
 `pnpm playground:e2e` launches Chrome through DevTools, loads the local playground, renders a smaller MP4 and MP3, and writes `.tmp/playground-e2e-server.png`.
 
 `PLAYGROUND_E2E_STATIC=1 pnpm playground:e2e` serves `dist/docs-site` with COOP/COEP headers, blocks `/api/*`, verifies browser-only ffmpac rendering, and writes `.tmp/playground-e2e-static.png`.

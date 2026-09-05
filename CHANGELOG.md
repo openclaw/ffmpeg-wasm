@@ -2,49 +2,18 @@
 
 ## 0.1.0 - Unreleased
 
-### Changed
+**Highlights:** Lightweight FFmpeg and FFprobe WebAssembly for Node 24+, with CLI and TypeScript APIs plus the browser-only media workbench at `ffmpeg.sh`.
 
-- Updated pnpm to 11.25, Node types to 26.4.1, oxfmt to 0.66, and Wrangler to 4.128 while retaining the 48-hour package release delay and Node 24 runtime floor.
-- Updated pnpm to 11.24, Node types, formatting, type-aware linting, Wrangler, and pinned GitHub Actions while preserving the 48-hour package release delay and disabled dependency build scripts.
-- Updated FFmpeg to `n9.0.1` and libvpx to `v1.17.0` while retaining Emscripten `6.0.1` for stdin compatibility.
-
-### Fixed
-
-- Handle EPIPE when writing ffmpeg stdin after the child exits, so the Node process no longer crashes with an unhandled stream error. Thanks @SebTardif.
-- Ignore EPIPE on run-generated stdout and stderr writes so piping the CLI to a short consumer such as `head` no longer kills Node. Thanks @SebTardif.
-
-### Added
-
-- Added lightweight Node-focused FFmpeg and FFprobe WebAssembly package with a reproducible Emscripten build.
-- Added narrow LGPL FFmpeg build based on FFmpeg `n8.1.2`, with no GPL or nonfree configure flags.
-- Added static LAME integration for MP3 output while keeping generated FFmpeg assets under LGPL terms.
-- Added static libvpx integration for a browser-compatible VP8/Opus WebM sample generated entirely by wasm.
-- Added CLI-compatible `ffmpeg-wasm` and `ffprobe-wasm` package binaries.
-- Added TypeScript APIs for buffered runs and streaming execution: `runFfmpeg`, `runFfprobe`, `execFfmpeg`, and `execFfprobe`.
-- Added runtime options for custom `distDir`, `cwd`, `env`, `stdin`, `stdinMode`, and `timeoutMs`.
-- Added automatic `-nostdin` handling for FFmpeg while preserving explicit stdin pipe workflows.
-- Added wasm-only sample and verification fixture generation, with verifier executable lookup disabled and no native FFmpeg dependency.
-- Added media support for inspection, audio extraction, thumbnails, rawvideo pipe output, stdin/stdout pipe I/O, and segmentation.
-- Added MP4/MOV muxer support for lossless stream-copy clips with faststart metadata.
-- Added local one-page media playground with source preview, preset builder, generated FFmpeg args, inline output preview, and browser save/download flow.
-- Added public `ffmpeg.sh` workbench root with editable FFmpeg command text, GitHub and docs actions, sample loading, and inline output previews.
-- Added browser ffmpac runtime for the static workbench, using a dedicated worker so uploads, probing, MP4 renders, and MP3 renders run without a server backend.
-- Added ffmpac-backed workbench video downscale controls with width and quality presets, selectable MP3 rendering, and source-video seek syncing for poster-frame selection.
-- Added workbench render progress with browser ffmpac progress parsing, percentage updates, and an indeterminate working state for short jobs.
-- Added Chrome-driven playground E2E smoke test that loads the sample video, renders a smaller MP4 and MP3, and writes a screenshot artifact.
-- Added static browser workbench E2E coverage that blocks `/api/*` and verifies browser-only ffmpac MP4 and MP3 rendering.
-- Added GitHub Pages documentation source, static site builder, `ffmpeg.sh` CNAME, feature docs, and README playground screenshot.
-- Added `ffmpeg.sh`, `www.ffmpeg.sh`, and `docs.ffmpeg.sh` Cloudflare Pages domain routing with host canonicalization.
-- Added enabled codecs, demuxers, muxers, filters, protocols, and external libraries tuned for a small local media toolchain, including built-in MPEG-4 video encoding for lightweight MP4 downscales.
-- Added generated license copying so FFmpeg license files ship next to generated wasm assets in `dist/`.
-- Added README guidance for the MIT wrapper code and LGPL generated FFmpeg assets.
-- Added README usage docs for build prerequisites, CLI commands, TypeScript APIs, package linking, build tuning, and downstream wrapper wiring.
-- Added strict TypeScript project setup using `tsgo`, `oxlint`, and `oxfmt`.
-- Added TypeScript workbench client compilation so browser code is covered by `tsgo`, `oxlint`, and `oxfmt`.
-- Added strict oxlint policy with type-aware rules and warning denial.
-- Added live verification harness covering FFprobe text and JSON output, WAV and MP3 extraction, stdin pipes, stdout pipes, PNG frame output, rawvideo byte equality, segmentation, cwd and dist overrides, API validation failures, and CLI success and failure paths.
-- Added `pnpm test:e2e` to rebuild wasm assets from source and run the live verifier.
-- Added GitHub Actions CI for quality checks and full live wasm E2E on Node 24 with Emscripten, build caching, and `dist` artifact upload.
-- Added CI conversion proof artifacts, explicit CLI MP4/MP3 transcoding, codec and dimension assertions, native executable auditing, separate server/static browser screenshots, and reliable browser-process teardown.
-- Added Cloudflare Pages deployment workflow so the static workbench ships with the COOP/COEP headers required by browser ffmpac.
-- Verified generated Node and browser FFmpeg/FFprobe files at about 4.5–4.7 MB per tool.
+- Inspect media, extract WAV or MP3 audio, resize MP4 video, create PNG thumbnails, stream raw video, and segment audio without a native FFmpeg installation.
+- Edit and preview media locally in the `ffmpeg.sh` workbench: sample loading, editable FFmpeg commands, size and quality presets, MP3 output, poster-frame selection, render progress, and browser save/download support.
+- Run uploads, probing, and MP4/MP3 rendering in a dedicated browser ffmpac worker, with no server backend required for the static workbench.
+- Use CLI-compatible `ffmpeg-wasm` and `ffprobe-wasm` entrypoints, binary-safe buffered APIs (`runFfmpeg`, `runFfprobe`), and streaming APIs (`execFfmpeg`, `execFfprobe`).
+- Configure asset directories, working directories, environment, stdin, and timeouts; support stdin/stdout pipes and automatic FFmpeg `-nostdin` without breaking explicit pipe input.
+- Keep host signal handling under application control when using the library, with exception-safe `onSpawn` setup and conventional child signal exit codes; preserve SIGHUP/SIGINT/SIGTERM forwarding and forced termination in both CLIs. Thanks @SebTardif.
+- Handle closed stdin, stdout, and stderr pipes without unhandled EPIPE crashes, including output piped to short-lived consumers. Thanks @SebTardif.
+- Validate browser-issued media URLs and keep unexpected playground server error details in server logs. Thanks @vincentkoc.
+- Build narrow FFmpeg `n9.0.1` and libvpx `v1.17.0` assets with pinned LAME and Emscripten `6.0.1`, supporting MPEG-4, MP3, VP8/Opus WebM, and lossless MP4/MOV stream-copy clips with faststart metadata.
+- Keep wrapper code MIT licensed and generated FFmpeg assets LGPL-2.1-or-later, copy generated license files alongside wasm assets, and avoid GPL/nonfree build options.
+- Provide build, CLI, API, licensing, and downstream integration documentation, a local playground, and static workbench/docs deployment with the cross-origin isolation headers required by browser wasm.
+- Verify generated media entirely through wasm, including API/CLI conversions, codec and dimension assertions, pipes, PNG frames, raw byte equality, segmentation, failures, real OS signals, and Chrome-driven server/static browser rendering; publish CI proof artifacts and audit distributions for native executables.
+- Refresh TypeScript, pnpm, Node types, formatting, deployment tooling, and pinned GitHub Actions while retaining the Node 24 runtime floor, 48-hour package release delay, and disabled dependency build scripts. Thanks @vincentkoc.

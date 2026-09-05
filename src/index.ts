@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
+import { constants } from "node:os";
 import { resolve } from "node:path";
 import { endChildStdin } from "./end-stdin.js";
 
@@ -18,6 +19,7 @@ export interface RunOptions {
   stdin?: Buffer | Uint8Array | string;
   stdinMode?: "ignore" | "inherit";
   timeoutMs?: number;
+  onSpawn?: (child: ChildProcess) => void;
 }
 
 export interface RunResult {
@@ -143,9 +145,6 @@ function spawnTool(
     child.stderr.on("data", (chunk: Buffer) => {
       stderr.push(chunk);
     });
-    if (options.stdin !== undefined) {
-      endChildStdin(child.stdin, options.stdin, finishReject);
-    }
     child.on("error", (error) => {
       finishReject(error);
     });
@@ -162,6 +161,18 @@ function spawnTool(
         stderrText: Buffer.concat(stderr).toString("utf8"),
       });
     });
+    try {
+      options.onSpawn?.(child);
+    } catch (error) {
+      if (child.pid !== undefined) {
+        child.kill("SIGKILL");
+      }
+      finishReject(toError(error));
+      return;
+    }
+    if (options.stdin !== undefined) {
+      endChildStdin(child.stdin, options.stdin, finishReject);
+    }
   });
 }
 
@@ -178,7 +189,6 @@ function spawnToolStreaming(
       env: options.env ?? process.env,
       stdio: [hasStdin ? "pipe" : (options.stdinMode ?? "inherit"), "inherit", "inherit"],
     });
-    const cleanupSignals = forwardProcessSignals(child);
     let settled = false;
     let forceKill: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
@@ -194,7 +204,6 @@ function spawnToolStreaming(
             }, forcedKillDelayMs);
           }, options.timeoutMs);
     const cleanup = () => {
-      cleanupSignals();
       if (timeout) {
         clearTimeout(timeout);
       }
@@ -221,9 +230,6 @@ function spawnToolStreaming(
     child.on("error", (error) => {
       finishReject(error);
     });
-    if (options.stdin !== undefined) {
-      endChildStdin(child.stdin, options.stdin, finishReject);
-    }
     child.on("close", (code, signal) => {
       if (timedOut) {
         finishReject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
@@ -231,51 +237,23 @@ function spawnToolStreaming(
       }
       finishResolve(code ?? signalExitCode(signal));
     });
-  });
-}
-
-function forwardProcessSignals(child: ChildProcess) {
-  const listeners = forwardedSignals.map((signal) => {
-    let forceExit: ReturnType<typeof setTimeout> | undefined;
-    const listener = () => {
-      child.kill(signal);
-      forceExit ??= setTimeout(() => {
+    try {
+      options.onSpawn?.(child);
+    } catch (error) {
+      if (child.pid !== undefined) {
         child.kill("SIGKILL");
-        process.exit(128 + signalNumber(signal));
-      }, 5000);
-    };
-    process.once(signal, listener);
-    return () => {
-      if (forceExit) {
-        clearTimeout(forceExit);
       }
-      process.off(signal, listener);
-    };
-  });
-  return () => {
-    for (const cleanup of listeners) {
-      cleanup();
+      finishReject(toError(error));
+      return;
     }
-  };
+    if (options.stdin !== undefined) {
+      endChildStdin(child.stdin, options.stdin, finishReject);
+    }
+  });
 }
-
-const forwardedSignals = ["SIGHUP", "SIGINT", "SIGTERM"] as const;
 
 function signalExitCode(signal: NodeJS.Signals | null) {
-  return signal ? 128 + signalNumber(signal) : 1;
-}
-
-function signalNumber(signal: NodeJS.Signals) {
-  if (signal === "SIGHUP") {
-    return 1;
-  }
-  if (signal === "SIGINT") {
-    return 2;
-  }
-  if (signal === "SIGTERM") {
-    return 15;
-  }
-  return 0;
+  return signal ? 128 + (constants.signals[signal] ?? 0) : 1;
 }
 
 function normalizeArgs(tool: Tool, args: string[]): string[] {
