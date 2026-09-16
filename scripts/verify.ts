@@ -72,6 +72,7 @@ try {
       wavPath,
     ]),
   );
+  await step("API and CLI large ffprobe JSON", () => okLargeProbeOutput(wavPath));
   await step("mp3 transcode", () =>
     okFfmpeg([
       "-hide_banner",
@@ -297,6 +298,49 @@ async function okProbeJson(input: string) {
   }
   if (video.width !== 160 || video.height !== 90) {
     throw new Error(`ffprobe json bad video size: ${String(video.width)}x${String(video.height)}`);
+  }
+}
+
+async function okLargeProbeOutput(input: string) {
+  const comment = "x".repeat(1024 * 1024);
+  const tag = Buffer.from(`${comment}\0`);
+  // Append a RIFF INFO comment large enough to exceed a pipe's output buffer.
+  const list = Buffer.alloc(20 + tag.length + (tag.length % 2));
+  list.write("LIST");
+  list.writeUInt32LE(list.length - 8, 4);
+  list.write("INFOICMT", 8);
+  list.writeUInt32LE(tag.length, 16);
+  tag.copy(list, 20);
+  const wav = Buffer.concat([readFileSync(input), list]);
+  wav.writeUInt32LE(wav.length - 8, 4);
+  const taggedPath = join(work, "large-comment.wav");
+  writeFileSync(taggedPath, wav);
+  const args = ["-v", "error", "-show_entries", "format_tags=comment", "-of", "json", taggedPath];
+  const result = await runFfprobe(args, { timeoutMs: 30_000 });
+  if (result.exitCode !== 0) {
+    fail("large ffprobe json", result);
+  }
+  assertProbeComment(result.stdoutText, comment);
+  const cli = spawnSync(process.execPath, [resolve(root, "lib/src/ffprobe-cli.js"), ...args], {
+    encoding: "utf8",
+    maxBuffer: 2 * 1024 * 1024,
+    timeout: 30_000,
+  });
+  if (cli.status !== 0) {
+    throw new Error(`large CLI ffprobe json failed: ${spawnOutput(cli)}`);
+  }
+  assertProbeComment(cli.stdout, comment);
+}
+
+function assertProbeComment(text: string, comment: string) {
+  const parsed: unknown = JSON.parse(text);
+  if (
+    !isRecord(parsed) ||
+    !isRecord(parsed.format) ||
+    !isRecord(parsed.format.tags) ||
+    parsed.format.tags.comment !== comment
+  ) {
+    throw new Error("ffprobe JSON comment was truncated or changed");
   }
 }
 

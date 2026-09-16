@@ -1,10 +1,18 @@
 #!/usr/bin/env node
+import { writeSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { ignoreStdioEpipe } from "./ignore-stdio-epipe.js";
 
-ignoreStdioEpipe(process.stdout);
-ignoreStdioEpipe(process.stderr);
+interface BlockingOutput extends NodeJS.WriteStream {
+  _handle?: { setBlocking: (blocking: boolean) => void };
+}
+
+// Node streams (also initialized by worker_threads) make pipes nonblocking.
+// Emscripten's NODERAWFS uses synchronous writes and needs blocking descriptors.
+for (const output of [process.stdout, process.stderr]) {
+  // oxlint-disable-next-line no-underscore-dangle -- Node exposes descriptor blocking only through this handle.
+  (output as BlockingOutput)._handle?.setBlocking(true);
+}
 
 interface EmscriptenExitStatus {
   name?: string;
@@ -17,7 +25,7 @@ const tool = process.argv[2];
 const distDir = process.argv[3];
 const args = process.argv.slice(4);
 if (!tool || !distDir) {
-  process.stderr.write("usage: run-generated <ffmpeg|ffprobe> <dist-dir> [...args]\n");
+  writeOutput(2, "usage: run-generated <ffmpeg|ffprobe> <dist-dir> [...args]\n");
   process.exit(64);
 }
 
@@ -39,8 +47,12 @@ try {
     arguments: args,
     thisProgram: tool,
     locateFile: (name: string) => resolve(distDir, name),
-    print: (line: string) => process.stdout.write(`${line}\n`),
-    printErr: (line: string) => process.stderr.write(`${line}\n`),
+    print: (line: string) => {
+      writeOutput(1, `${line}\n`);
+    },
+    printErr: (line: string) => {
+      writeOutput(2, `${line}\n`);
+    },
     onExit: (code: number) => {
       exitCode = code;
       resolveExit();
@@ -62,10 +74,27 @@ try {
       },
     ),
   ]);
-  process.exit(exitCode);
 } catch (error) {
-  process.stderr.write(`${formatError(error)}\n`);
-  process.exit(1);
+  writeOutput(2, `${formatError(error)}\n`);
+  exitCode = 1;
+}
+
+process.exit(exitCode);
+
+function writeOutput(fd: 1 | 2, text: string): void {
+  // Complete print callbacks before forced exit, including partial writes.
+  const bytes = Buffer.from(text);
+  try {
+    let offset = 0;
+    while (offset < bytes.length) {
+      offset += writeSync(fd, bytes, offset, bytes.length - offset);
+    }
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "EPIPE") {
+      return;
+    }
+    throw error;
+  }
 }
 
 function getDefaultFactory(value: unknown): EmscriptenModuleFactory | undefined {
