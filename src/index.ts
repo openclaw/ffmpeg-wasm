@@ -125,6 +125,9 @@ function spawnTool(
       }
       settled = true;
       cleanup();
+      if (child.pid !== undefined) {
+        child.kill("SIGKILL");
+      }
       rejectPromise(error);
     };
     const finishResolve = (value: RunResult) => {
@@ -163,15 +166,11 @@ function spawnTool(
     });
     try {
       options.onSpawn?.(child);
-    } catch (error) {
-      if (child.pid !== undefined) {
-        child.kill("SIGKILL");
+      if (options.stdin !== undefined) {
+        endChildStdin(child.stdin, options.stdin, finishReject);
       }
+    } catch (error) {
       finishReject(toError(error));
-      return;
-    }
-    if (options.stdin !== undefined) {
-      endChildStdin(child.stdin, options.stdin, finishReject);
     }
   });
 }
@@ -217,6 +216,9 @@ function spawnToolStreaming(
       }
       settled = true;
       cleanup();
+      if (child.pid !== undefined) {
+        child.kill("SIGKILL");
+      }
       rejectPromise(error);
     };
     const finishResolve = (value: number) => {
@@ -239,15 +241,11 @@ function spawnToolStreaming(
     });
     try {
       options.onSpawn?.(child);
-    } catch (error) {
-      if (child.pid !== undefined) {
-        child.kill("SIGKILL");
+      if (options.stdin !== undefined) {
+        endChildStdin(child.stdin, options.stdin, finishReject);
       }
+    } catch (error) {
       finishReject(toError(error));
-      return;
-    }
-    if (options.stdin !== undefined) {
-      endChildStdin(child.stdin, options.stdin, finishReject);
     }
   });
 }

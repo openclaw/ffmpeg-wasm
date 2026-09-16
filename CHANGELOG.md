@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep runner output pipes blocking and complete writes before exit, preserving large FFprobe JSON, binary output, and failure diagnostics in APIs and CLIs.
+- Terminate FFmpeg/FFprobe children when stdin setup or writes fail, preserving the original error without leaving a process running after rejection.
+
 ## 0.1.0 - 2026-09-05
 
 **Highlights:** Lightweight FFmpeg and FFprobe WebAssembly for Node 24+, with CLI and TypeScript APIs plus the browser-only media workbench at `ffmpeg.sh`.

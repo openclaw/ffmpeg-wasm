@@ -31,7 +31,7 @@ if (probe.exitCode !== 0) {
 }
 ```
 
-The result includes `stdout`, `stderr`, `stdoutText`, `stderrText`, and `exitCode`.
+The result includes `stdout`, `stderr`, `stdoutText`, `stderrText`, and `exitCode`. The runner completes stdout and stderr writes before exiting, including large probe JSON and failure diagnostics.
 
 ## Streaming Runs
 
@@ -65,6 +65,8 @@ All APIs accept:
 - `stdinMode` for binary or text input.
 - `timeoutMs` for bounded work.
 - `onSpawn` for synchronous setup of the spawned child. Throwing from this callback kills the child and rejects the run. The package CLIs use this to forward host signals.
+
+If writing `stdin` fails, the call rejects with the original error and terminates the child so it cannot continue running after the call has failed.
 
 FFmpeg receives `-nostdin` automatically unless the caller already supplies it. Explicit `-i -` pipe workflows still work.
 
