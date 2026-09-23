@@ -8,8 +8,8 @@ description: "Install prerequisites and build the local wasm FFmpeg package."
 ## Requirements
 
 - Node 24+
-- pnpm 12.3.1+
-- Emscripten SDK 6.0.1 with `emcc`, `em++`, `emar`, and `emranlib`
+- pnpm 12.5.1+
+- Emscripten SDK 6.0.10 with `emcc`, `em++`, `emar`, and `emranlib`
 - Autotools, `make`, `pkg-config`, `nasm`, and `yasm`
 
 On macOS:
