@@ -48,6 +48,8 @@
     "node/no-sync": "off",
     "prefer-destructuring": "off",
     "node/no-process-env": "off",
+    "node/no-top-level-await": "off",
+    "one-var": ["error", "never"],
     "oxc/no-async-await": "off",
     "oxc/no-optional-chaining": "off",
     "oxc/no-rest-spread-properties": "off",

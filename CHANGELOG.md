@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Update the wasm build to FFmpeg 9.0.2 and Emscripten 6.0.10 for upstream media parsing and compiler fixes.
 - Preserve timeout errors when terminating FFmpeg/FFprobe interrupts a pending stdin write, instead of reporting a secondary broken-pipe error.
 
 - Keep runner output pipes blocking and complete writes before exit, preserving large FFprobe JSON, binary output, and failure diagnostics in APIs and CLIs.
