@@ -62,8 +62,8 @@ All APIs accept:
 - `distDir` for a custom wasm asset directory.
 - `cwd` and `env` for process isolation.
 - `stdin` for pipe input.
-- `stdinMode` for binary or text input.
-- `timeoutMs` for bounded work.
+- `stdinMode` to ignore or inherit process stdin when no `stdin` payload is supplied.
+- `timeoutMs` for bounded work. A timeout rejects with a timeout error, including when terminating the child interrupts a pending stdin write.
 - `onSpawn` for synchronous setup of the spawned child. Throwing from this callback kills the child and rejects the run. The package CLIs use this to forward host signals.
 
 If writing `stdin` fails, the call rejects with the original error and terminates the child so it cannot continue running after the call has failed.
