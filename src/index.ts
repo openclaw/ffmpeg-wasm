@@ -47,24 +47,31 @@ export function execFfprobe(args: string[], options: RunOptions = {}): Promise<n
 }
 
 export function runTool(tool: Tool, args: string[], options: RunOptions = {}): Promise<RunResult> {
-  try {
-    if (!Array.isArray(args)) {
-      throw new TypeError("args must be an array");
-    }
-    const distDir = resolve(options.distDir ?? defaultDist);
-    const jsPath = resolve(distDir, `${tool}.js`);
-    const wasmPath = resolve(distDir, `${tool}_g.wasm`);
-    if (!existsSync(jsPath) || !existsSync(wasmPath)) {
-      throw new Error(`Missing ${tool} wasm assets in ${distDir}; run pnpm build.`);
-    }
-
-    return spawnTool(tool, distDir, normalizeArgs(tool, args), options);
-  } catch (error) {
-    return Promise.reject(toError(error));
-  }
+  return startTool(tool, args, options, true);
 }
 
 export function execTool(tool: Tool, args: string[], options: RunOptions = {}): Promise<number> {
+  return startTool(tool, args, options, false);
+}
+
+function startTool(
+  tool: Tool,
+  args: string[],
+  options: RunOptions,
+  capture: true,
+): Promise<RunResult>;
+function startTool(
+  tool: Tool,
+  args: string[],
+  options: RunOptions,
+  capture: false,
+): Promise<number>;
+function startTool(
+  tool: Tool,
+  args: string[],
+  options: RunOptions,
+  capture: boolean,
+): Promise<RunResult | number> {
   try {
     if (!Array.isArray(args)) {
       throw new TypeError("args must be an array");
@@ -76,7 +83,7 @@ export function execTool(tool: Tool, args: string[], options: RunOptions = {}): 
       throw new Error(`Missing ${tool} wasm assets in ${distDir}; run pnpm build.`);
     }
 
-    return spawnToolStreaming(tool, distDir, normalizeArgs(tool, args), options);
+    return spawnTool(tool, distDir, normalizeArgs(tool, args), options, capture);
   } catch (error) {
     return Promise.reject(toError(error));
   }
@@ -87,28 +94,34 @@ function spawnTool(
   distDir: string,
   args: string[],
   options: RunOptions,
-): Promise<RunResult> {
+  capture: boolean,
+): Promise<RunResult | number> {
   return new Promise((resolvePromise, rejectPromise) => {
     const hasStdin = options.stdin !== undefined;
     const child = spawn(process.execPath, [runner, tool, distDir, ...args.map(String)], {
       cwd: options.cwd ?? process.cwd(),
       env: options.env ?? process.env,
-      stdio: [hasStdin ? "pipe" : (options.stdinMode ?? "ignore"), "pipe", "pipe"],
+      stdio: [
+        hasStdin ? "pipe" : (options.stdinMode ?? (capture ? "ignore" : "inherit")),
+        capture ? "pipe" : "inherit",
+        capture ? "pipe" : "inherit",
+      ],
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let settled = false;
     let forceKill: ReturnType<typeof setTimeout> | undefined;
-    let timedOut = false;
+    let timeoutError: Error | undefined;
     const timeout =
       options.timeoutMs === undefined
         ? undefined
         : setTimeout(() => {
-            timedOut = true;
+            // Record the cause before termination can fail a pending stdin write.
+            const error = new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`);
+            timeoutError = error;
             child.kill("SIGTERM");
             forceKill = setTimeout(() => {
-              child.kill("SIGKILL");
-              finishReject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
+              finishReject(error);
             }, forcedKillDelayMs);
           }, options.timeoutMs);
     const cleanup = () => {
@@ -128,117 +141,46 @@ function spawnTool(
       if (child.pid !== undefined) {
         child.kill("SIGKILL");
       }
-      rejectPromise(error);
+      rejectPromise(timeoutError ?? error);
     };
-    const finishResolve = (value: RunResult) => {
+    child.on("error", finishReject);
+    child.on("close", (code, signal) => {
+      if (timeoutError) {
+        finishReject(timeoutError);
+        return;
+      }
       if (settled) {
         return;
       }
       settled = true;
       cleanup();
-      resolvePromise(value);
-    };
-    if (!child.stdout || !child.stderr) {
-      finishReject(new Error(`Failed to capture ${tool} wasm stdio`));
-      return;
-    }
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout.push(chunk);
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr.push(chunk);
-    });
-    child.on("error", (error) => {
-      finishReject(error);
-    });
-    child.on("close", (code, signal) => {
-      if (timedOut) {
-        finishReject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
+      const exitCode = code ?? signalExitCode(signal);
+      if (!capture) {
+        resolvePromise(exitCode);
         return;
       }
-      finishResolve({
-        exitCode: code ?? signalExitCode(signal),
-        stdout: Buffer.concat(stdout),
-        stderr: Buffer.concat(stderr),
-        stdoutText: Buffer.concat(stdout).toString("utf8"),
-        stderrText: Buffer.concat(stderr).toString("utf8"),
+      const stdoutBuffer = Buffer.concat(stdout);
+      const stderrBuffer = Buffer.concat(stderr);
+      resolvePromise({
+        exitCode,
+        stdout: stdoutBuffer,
+        stderr: stderrBuffer,
+        stdoutText: stdoutBuffer.toString("utf8"),
+        stderrText: stderrBuffer.toString("utf8"),
       });
     });
-    try {
-      options.onSpawn?.(child);
-      if (options.stdin !== undefined) {
-        endChildStdin(child.stdin, options.stdin, finishReject);
+    if (capture) {
+      if (!child.stdout || !child.stderr) {
+        finishReject(new Error(`Failed to capture ${tool} wasm stdio`));
+        return;
       }
-    } catch (error) {
-      finishReject(toError(error));
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdout.push(chunk);
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr.push(chunk);
+      });
     }
-  });
-}
-
-function spawnToolStreaming(
-  tool: Tool,
-  distDir: string,
-  args: string[],
-  options: RunOptions,
-): Promise<number> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const hasStdin = options.stdin !== undefined;
-    const child = spawn(process.execPath, [runner, tool, distDir, ...args.map(String)], {
-      cwd: options.cwd ?? process.cwd(),
-      env: options.env ?? process.env,
-      stdio: [hasStdin ? "pipe" : (options.stdinMode ?? "inherit"), "inherit", "inherit"],
-    });
-    let settled = false;
-    let forceKill: ReturnType<typeof setTimeout> | undefined;
-    let timedOut = false;
-    const timeout =
-      options.timeoutMs === undefined
-        ? undefined
-        : setTimeout(() => {
-            timedOut = true;
-            child.kill("SIGTERM");
-            forceKill = setTimeout(() => {
-              child.kill("SIGKILL");
-              finishReject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
-            }, forcedKillDelayMs);
-          }, options.timeoutMs);
-    const cleanup = () => {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-      if (forceKill) {
-        clearTimeout(forceKill);
-      }
-    };
-    const finishReject = (error: Error) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      if (child.pid !== undefined) {
-        child.kill("SIGKILL");
-      }
-      rejectPromise(error);
-    };
-    const finishResolve = (value: number) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      resolvePromise(value);
-    };
-    child.on("error", (error) => {
-      finishReject(error);
-    });
-    child.on("close", (code, signal) => {
-      if (timedOut) {
-        finishReject(new Error(`${tool} wasm timed out after ${options.timeoutMs}ms`));
-        return;
-      }
-      finishResolve(code ?? signalExitCode(signal));
-    });
     try {
       options.onSpawn?.(child);
       if (options.stdin !== undefined) {
