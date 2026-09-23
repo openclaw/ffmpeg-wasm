@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve timeout errors when terminating FFmpeg/FFprobe interrupts a pending stdin write, instead of reporting a secondary broken-pipe error.
+
 - Keep runner output pipes blocking and complete writes before exit, preserving large FFprobe JSON, binary output, and failure diagnostics in APIs and CLIs.
 - Terminate FFmpeg/FFprobe children when stdin setup or writes fail, preserving the original error without leaving a process running after rejection.
 
