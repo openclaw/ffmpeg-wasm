@@ -33,12 +33,12 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
-    "oxfmt": "^0.68.0",
-    "oxlint": "1.83.0",
+    "oxfmt": "^0.70.0",
+    "oxlint": "1.85.0",
     "oxlint-tsgolint": "^7.0.2002",
     "rimraf": "^6.1.3",
     "typescript": "^7.0.2",
-    "wrangler": "4.135.0"
+    "wrangler": "4.136.1"
   },
   "engines": {
     "node": ">=24"
