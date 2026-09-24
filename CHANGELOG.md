@@ -2,12 +2,15 @@
 
 ## Unreleased
 
-- Release the previous rendered media Blob URL when loading a new source in the workbench, avoiding retained output buffers during repeated editing.
-- Update the wasm build to FFmpeg 9.0.2 and Emscripten 6.0.10 for upstream media parsing and compiler fixes.
-- Preserve timeout errors when terminating FFmpeg/FFprobe interrupts a pending stdin write, instead of reporting a secondary broken-pipe error.
+## 0.1.1 - 2026-09-24
+
+**Highlights:** Reliable large outputs and subprocess cleanup, lower memory retention in the workbench, and refreshed FFmpeg and Emscripten patch releases with the same Node 24+ runtime requirement.
 
 - Keep runner output pipes blocking and complete writes before exit, preserving large FFprobe JSON, binary output, and failure diagnostics in APIs and CLIs.
+- Preserve timeout errors when terminating FFmpeg/FFprobe interrupts a pending stdin write, instead of reporting a secondary broken-pipe error.
 - Terminate FFmpeg/FFprobe children when stdin setup or writes fail, preserving the original error without leaving a process running after rejection.
+- Release the previous rendered media Blob URL when loading a new source in the workbench, avoiding retained output buffers during repeated editing.
+- Update the wasm build to FFmpeg 9.0.2 and Emscripten 6.0.10 for upstream media parsing and compiler fixes.
 
 ## 0.1.0 - 2026-09-05
 
