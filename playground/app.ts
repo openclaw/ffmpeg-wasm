@@ -367,6 +367,9 @@ async function loadSample() {
 async function setSourceFile(file: File) {
   state.file = file;
   state.probe = null;
+  if (state.lastOutput?.url !== undefined) {
+    URL.revokeObjectURL(state.lastOutput.url);
+  }
   state.lastOutput = null;
   if (state.inputUrl !== null) {
     URL.revokeObjectURL(state.inputUrl);
@@ -702,7 +705,7 @@ async function probeFileInBrowser(file: File): Promise<ProbeResult> {
 async function renderWithBrowserFfmpac(file: File): Promise<RenderOutput> {
   const operation = state.operation;
   const inputPath = `/input${inputExtension(file.name)}`;
-  const outputName = backendOutputName();
+  const outputName = displayOutputName();
   const outputPath = `/${outputName}`;
   const args = buildBackendArgs(inputPath, outputPath);
   const result = await runBrowserTool("ffmpeg", {
@@ -1092,10 +1095,6 @@ function displayOutputName() {
       throw new Error("Unsupported operation");
     }
   }
-}
-
-function backendOutputName() {
-  return displayOutputName();
 }
 
 function savePickerOptions(output: RenderOutput | null = state.lastOutput): BrowserSaveOptions {

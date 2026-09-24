@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Release the previous rendered media Blob URL when loading a new source in the workbench, avoiding retained output buffers during repeated editing.
 - Update the wasm build to FFmpeg 9.0.2 and Emscripten 6.0.10 for upstream media parsing and compiler fixes.
 - Preserve timeout errors when terminating FFmpeg/FFprobe interrupts a pending stdin write, instead of reporting a secondary broken-pipe error.
 

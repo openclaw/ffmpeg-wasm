@@ -31,6 +31,8 @@ The workbench is a ffmpac test surface. It does not use browser-native media enc
 - Saves through the browser file picker when available, with a download fallback.
 - Uses the source video's scrubber as a poster-frame picker when you seek.
 
+Loading new media discards the previous rendered output and releases its browser Blob URL.
+
 ## Presets
 
 - Lossless MP4 clip.
