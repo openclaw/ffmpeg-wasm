@@ -165,7 +165,7 @@ pnpm check
 
 On macOS and Linux, `pnpm verify` also sends real OS signals while wasm is reading stdin: both streaming APIs preserve application-owned cancellation, and both CLIs forward SIGHUP, SIGINT, and SIGTERM.
 
-`pnpm check` runs `tsc`, strict `oxlint`, and `oxfmt --check`.
+`pnpm check` runs TypeScript compilation, unit tests, strict `oxlint`, a docs build, and `oxfmt --check`.
 
 ## CLI
 
@@ -270,10 +270,12 @@ Useful places:
 
 ## CI
 
-GitHub Actions runs two jobs:
+CI runs:
 
 - TypeScript, lint, and format on Node 24.
 - Static docs site build.
 - Full live wasm E2E with Emscripten, explicit API and CLI media conversions, codec/dimension assertions, native executable auditing, server and static browser workbench tests, build caching, and proof artifact uploads.
 
 CI intentionally builds from source instead of trusting checked-in wasm output. `dist/` is ignored and regenerated. The wasm job uploads `dist/`, converted media, a verification manifest, and both browser screenshots for inspection.
+
+See [RELEASING.md](RELEASING.md) for the source-only GitHub release procedure.
