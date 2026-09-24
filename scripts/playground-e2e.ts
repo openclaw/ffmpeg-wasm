@@ -232,6 +232,19 @@ try {
       if (!imageState.outputImage || !imageState.outputSource.startsWith("blob:")) {
         throw new Error(`Unexpected image render result: ${JSON.stringify(imageState)}`);
       }
+      await clickSelector(cdp, "[data-testid=sample-button]");
+      await waitFor(
+        cdp,
+        "document.querySelector('[data-testid=status-text]')?.textContent.trim() === 'Ready' && document.querySelector('[data-testid=save-button]')?.disabled === true",
+        180_000,
+      );
+      const discardedOutput = await runtimeEvaluate(
+        cdp,
+        `fetch(${JSON.stringify(imageState.outputSource)}).then(() => false, () => true)`,
+      );
+      if (discardedOutput.result?.value !== true) {
+        throw new Error("Loading new media left the discarded output Blob URL accessible");
+      }
       await writeFile(screenshotPath, await captureFullPageScreenshot(cdp));
       console.log(
         `playground e2e ok (${mode}, ${videoState.lastRender.name}, ${audioState.lastRender.name})`,
