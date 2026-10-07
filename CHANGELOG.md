@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Ignore probe results, render output, progress, and save status from a replaced source, keeping the newly selected file's state intact in both workbench backends. Thanks @SebTardif.
+- Ignore probe results, render output, progress, and render-save status from a replaced source, keeping the newly selected file's state intact in both workbench backends. Thanks @SebTardif.
+- Refresh Emscripten to 6.0.11, pnpm, Node types, formatting, lint, and deployment tooling while retaining Node 24+, the 48-hour dependency cooldown, and disabled dependency build scripts.
 
 ## 0.1.1 - 2026-09-24
 

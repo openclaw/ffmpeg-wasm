@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 60
     env:
       EM_CACHE: ${{ github.workspace }}/.cache/emcache
-      EMSDK_VERSION: 6.0.10
+      EMSDK_VERSION: 6.0.11
       FFMPEG_VERSION: n9.0.2
       LAME_REF: 2badea1974ae36cb8312afe99cff1e6b3b5decee
       LIBVPX_REF: v1.17.0
@@ -41,7 +41,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
-          version: 12.5.1
+          version: 12.9.1
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
