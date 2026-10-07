@@ -32,7 +32,7 @@ Default refs:
 - LAME: `2badea1974ae36cb8312afe99cff1e6b3b5decee` from `ffmpegwasm/lame`
 - libvpx: `v1.17.0`
 - Runtime: Node 24+
-- Compiler: Emscripten 6.0.10 via `emcc`
+- Compiler: Emscripten 6.0.11 via `emcc`
 
 Enabled programs:
 
@@ -129,7 +129,7 @@ pnpm install
 
 Required system tools for a full wasm build:
 
-- Emscripten SDK 6.0.10 with `emcc`, `em++`, `emar`, and `emranlib` on `PATH`
+- Emscripten SDK 6.0.11 with `emcc`, `em++`, `emar`, and `emranlib` on `PATH`
 - Autotools for LAME
 - `make`, `pkg-config`, `nasm`, `yasm`
 
