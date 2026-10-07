@@ -1,3 +1,9 @@
+import {
+  isCurrentSource,
+  resultForCurrentSource,
+  statusForRenderProgress,
+} from "./current-source.js";
+
 type Operation = "audio-mp3" | "audio-wav" | "clip-mp4" | "hash-raw" | "poster-png" | "video-mp4";
 export type WorkbenchOperation = Operation;
 type StatusMode = "busy" | "error" | "idle";
@@ -371,6 +377,9 @@ async function setSourceFile(file: File) {
     URL.revokeObjectURL(state.lastOutput.url);
   }
   state.lastOutput = null;
+  hideProgress();
+  // oxlint-disable-next-line no-underscore-dangle -- Stable browser E2E test hook.
+  delete browserGlobal.__lastRender;
   if (state.inputUrl !== null) {
     URL.revokeObjectURL(state.inputUrl);
   }
@@ -385,10 +394,18 @@ async function setSourceFile(file: File) {
   updateCommand();
   setStatus("Probing", "busy");
   try {
-    state.probe = await probeFile(file);
-    updateSourceMetrics(file, state.probe);
+    const probed = await probeFile(file);
+    const current = resultForCurrentSource(file, state.file, probed);
+    if (current === null) {
+      return;
+    }
+    state.probe = current;
+    updateSourceMetrics(file, current);
     setStatus("Ready", "idle");
   } catch (error) {
+    if (!isCurrentSource(file, state.file)) {
+      return;
+    }
     setStatus(errorMessage(error), "error");
   }
 }
@@ -417,7 +434,8 @@ async function probeFile(file: File): Promise<ProbeResult> {
 }
 
 async function renderOutput(saveAfterRender: boolean) {
-  if (state.file === null) {
+  const source = state.file;
+  if (source === null) {
     setStatus("Load media first", "error");
     return;
   }
@@ -432,6 +450,9 @@ async function renderOutput(saveAfterRender: boolean) {
     try {
       saveHandle = await showSaveFilePicker(savePickerOptions(null));
     } catch (error) {
+      if (!isCurrentSource(source, state.file)) {
+        return;
+      }
       if (error instanceof DOMException && error.name === "AbortError") {
         setStatus("Save canceled", "idle");
         return;
@@ -440,23 +461,36 @@ async function renderOutput(saveAfterRender: boolean) {
     }
   }
 
+  if (!isCurrentSource(source, state.file)) {
+    return;
+  }
+
   setStatus("Rendering", "busy");
   showProgress("Preparing ffmpac", null);
   elements.renderButton.disabled = true;
   elements.renderSaveButton.disabled = true;
   try {
     const rendered = await renderWithBackend();
-    setLastOutput(rendered);
+    const fresh = resultForCurrentSource(source, state.file, rendered);
+    if (fresh === null) {
+      return;
+    }
+    setLastOutput(fresh);
     if (saveHandle !== null) {
-      await writeBlobToHandle(saveHandle, rendered.blob);
-      setStatus("Saved", "idle");
+      await writeBlobToHandle(saveHandle, fresh.blob);
+      if (isCurrentSource(source, state.file)) {
+        setStatus("Saved", "idle");
+      }
     } else if (saveAfterRender) {
-      downloadBlob(rendered.blob, rendered.name);
+      downloadBlob(fresh.blob, fresh.name);
       setStatus("Downloaded", "idle");
     } else {
       setStatus("Rendered", "idle");
     }
   } catch (error) {
+    if (!isCurrentSource(source, state.file)) {
+      return;
+    }
     setStatus(errorMessage(error), "error");
   } finally {
     hideProgress();
@@ -711,7 +745,7 @@ async function renderWithBrowserFfmpac(file: File): Promise<RenderOutput> {
   const result = await runBrowserTool("ffmpeg", {
     args: progressArgs(args),
     inputPath,
-    onProgress: renderProgressHandler(progressDurationSeconds(operation, args)),
+    onProgress: renderProgressHandler(file, progressDurationSeconds(operation, args)),
     outputPath,
     source: file,
   });
@@ -839,11 +873,17 @@ function progressArgs(args: string[]) {
   return ["-progress", "pipe:2", "-nostats", ...args];
 }
 
-function renderProgressHandler(durationSeconds: number | null) {
+function renderProgressHandler(source: File, durationSeconds: number | null) {
   return (progress: BrowserToolProgress) => {
+    if (!isCurrentSource(source, state.file)) {
+      return;
+    }
+    const status = statusForRenderProgress(source, state.file, progress, durationSeconds);
     if (progress.phase === "end") {
       showProgress("Finalizing output", 1);
-      setStatus("Rendering 100%", "busy");
+      if (status !== null) {
+        setStatus(status, "busy");
+      }
       return;
     }
     const ratio =
@@ -861,8 +901,8 @@ function renderProgressHandler(durationSeconds: number | null) {
       detailParts.push(`speed ${progress.speed}`);
     }
     showProgress(detailParts.join(" · ") || "ffmpac is working", ratio);
-    if (ratio !== null) {
-      setStatus(`Rendering ${Math.round(ratio * 100)}%`, "busy");
+    if (status !== null) {
+      setStatus(status, "busy");
     }
   };
 }

@@ -360,6 +360,14 @@ function copyWorkbench() {
   copyFileSync(resolve(compiledPlaygroundDir, "app.js"), resolve(outDir, "app.js"));
   copyFileSync(resolve(compiledPlaygroundDir, "app.js.map"), resolve(outDir, "app.js.map"));
   copyFileSync(
+    resolve(compiledPlaygroundDir, "current-source.js"),
+    resolve(outDir, "current-source.js"),
+  );
+  copyFileSync(
+    resolve(compiledPlaygroundDir, "current-source.js.map"),
+    resolve(outDir, "current-source.js.map"),
+  );
+  copyFileSync(
     resolve(compiledPlaygroundDir, "ffmpac-worker.js"),
     resolve(outDir, "ffmpac-worker.js"),
   );

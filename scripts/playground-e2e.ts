@@ -7,6 +7,7 @@ import { createServer, request as httpRequest, type ServerResponse } from "node:
 import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
+import { assertSourceRaces } from "./playground-source-races.js";
 
 const root = resolve(import.meta.dirname, "..", "..");
 const port = String(4174 + Math.floor(Math.random() * 1000));
@@ -163,6 +164,15 @@ try {
       await cdp.send("Page.bringToFront");
       await cdp.send("Page.navigate", { url: baseUrl });
       await waitFor(cdp, "document.readyState === 'complete'", 30_000);
+      const races = await runtimeEvaluate(cdp, `(${assertSourceRaces.toString()})(${staticMode})`);
+      if (races.result?.value !== "ok") {
+        throw new Error(`Source replacement regression: ${String(races.result?.value)}`);
+      }
+      console.log(`source replacement regressions ok (${mode})`);
+      await writeFile(
+        resolve(root, ".tmp", `playground-source-races-${mode}.png`),
+        await captureFullPageScreenshot(cdp),
+      );
       await clickSelector(cdp, "[data-testid=sample-button]");
       await waitFor(
         cdp,

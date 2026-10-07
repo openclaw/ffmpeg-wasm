@@ -76,6 +76,14 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
     await sendStatic(response, "app.js.map", "application/json; charset=utf-8");
     return;
   }
+  if (request.method === "GET" && url.pathname === "/current-source.js") {
+    await sendStatic(response, "current-source.js", "text/javascript; charset=utf-8");
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/current-source.js.map") {
+    await sendStatic(response, "current-source.js.map", "application/json; charset=utf-8");
+    return;
+  }
   if (request.method === "GET" && url.pathname === "/styles.css") {
     await sendStatic(response, "styles.css", "text/css; charset=utf-8");
     return;
@@ -399,7 +407,10 @@ async function writeRequestBody(request: IncomingMessage, outputPath: string) {
 }
 
 async function sendStatic(response: ServerResponse, fileName: string, contentType: string) {
-  const directory = fileName.startsWith("app.js") ? compiledPlaygroundDir : playgroundDir;
+  const directory =
+    fileName.startsWith("app.js") || fileName.startsWith("current-source.js")
+      ? compiledPlaygroundDir
+      : playgroundDir;
   await sendFile(response, resolve(directory, fileName), { "Content-Type": contentType });
 }
 

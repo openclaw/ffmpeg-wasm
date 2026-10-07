@@ -31,7 +31,7 @@ The workbench is a ffmpac test surface. It does not use browser-native media enc
 - Saves through the browser file picker when available, with a download fallback.
 - Uses the source video's scrubber as a poster-frame picker when you seek.
 
-Loading new media discards the previous rendered output and releases its browser Blob URL.
+Loading new media discards the previous rendered output and releases its browser Blob URL. Pending probes and renders for the previous file cannot replace the new file's details, output, or status. Old work may finish in the background; render buttons become available again when it finishes. Changing the source while choosing a save destination cancels that pending render.
 
 ## Presets
 
