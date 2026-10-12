@@ -1,26 +1,33 @@
 # Releasing
 
-This repository distributes source through GitHub Releases. The package remains
-private; releases do not publish to npm or attach prebuilt wasm binaries. Users
-build the selected tag with the toolchains documented in `docs/install.md`.
+This repository ships source through `release-source.yml`; its npm manifest stays
+private. Users build with the documented toolchain. The release rehearsal builds
+and verifies WASM from source after the quality gates; independent push CI also
+covers the browser workbench. Generated WASM is not a release asset. The workflow
+publishes frozen-commit source tar/zip archives, changelog notes, inventory, and
+`SHA256SUMS`.
 
-1. Run the quality and runtime gates on Linux with Node 24 and the documented
-   Emscripten toolchain:
+The `Release` workflow calls the shared OpenClaw archetype at `@v1`. It
+requires a protected `main`, matching version metadata, a dated changelog section,
+and successful independent **push** CI on the exact release commit. It verifies
+SSH-signed annotated tags against `.github/release-allowed-signers` and rejects
+moved tags or an existing GitHub Release.
 
-   ```sh
-   pnpm install --frozen-lockfile
-   pnpm check
-   pnpm test:e2e
-   CI=true pnpm playground:e2e
-   pnpm docs:build:compiled
-   CI=true PLAYGROUND_E2E_STATIC=1 pnpm playground:e2e
-   ```
+Prepare the version and dated `## X.Y.Z - YYYY-MM-DD` changelog section in a PR,
+retain `## Unreleased`, and merge only after CI and review. After explicit release
+authorization, create and push an SSH-signed annotated `vX.Y.Z` tag at that merged
+commit using an allowed signing key. Tag pushes publish through Actions; manual
+GitHub Release creation is retired. A live dispatch cannot create a missing signed
+tag: create the signed tag first.
 
-2. Bump `package.json`, finalize the changelog as `## X.Y.Z - YYYY-MM-DD` with a
-   highlights paragraph, and retain an empty `## Unreleased` section. Use a patch
-   version for fixes; use a minor version for features or compatibility changes.
-3. Review and merge the release PR after its exact head passes CI.
-4. Tag the merged release commit as `vX.Y.Z`, push the tag, and create a published
-   GitHub Release using the complete matching changelog section as its body.
-5. Verify the remote tag, package version, published release, and changelog body
-   agree. There is no tag-triggered publication workflow or npm registry gate.
+For a no-publish rehearsal, dispatch `release.yml` on current `main` with a version
+that already has a dated changelog section and `dry_run=true` (the default):
+
+```sh
+gh workflow run release.yml --ref main -f version=0.1.1 -f dry_run=true
+```
+
+The rehearsal exercises current protected main, even when the version already has
+an older tag. It creates no tag, release, or registry publication. Inspect every
+job and the retained verification artifacts before release. Real releases never
+move a tag or overwrite an existing version.
