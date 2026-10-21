@@ -9,6 +9,8 @@ const root = resolve(here, "..", "..");
 const defaultDist = resolve(root, "dist");
 const runner = resolve(here, "run-generated.js");
 const forcedKillDelayMs = 5000;
+// A child that exits after reading only part of stdin breaks the pipe before Node reports its exit.
+const stdinExitGraceMs = 1000;
 
 export type Tool = "ffmpeg" | "ffprobe";
 
@@ -112,6 +114,7 @@ function spawnTool(
     let settled = false;
     let forceKill: ReturnType<typeof setTimeout> | undefined;
     let timeoutError: Error | undefined;
+    let stdinBrokenPipe: ReturnType<typeof setTimeout> | undefined;
     const timeout =
       options.timeoutMs === undefined
         ? undefined
@@ -131,6 +134,9 @@ function spawnTool(
       if (forceKill) {
         clearTimeout(forceKill);
       }
+      if (stdinBrokenPipe) {
+        clearTimeout(stdinBrokenPipe);
+      }
     };
     const finishReject = (error: Error) => {
       if (settled) {
@@ -143,7 +149,27 @@ function spawnTool(
       }
       rejectPromise(timeoutError ?? error);
     };
+    const onStdinError = (error: Error) => {
+      if (!isBrokenPipe(error)) {
+        finishReject(error);
+        return;
+      }
+      // FFprobe and FFmpeg (-t, -frames) may exit successfully without reading all stdin.
+      // Let the exit status decide; only reject if the child keeps running without stdin.
+      if (child.exitCode !== null || child.signalCode !== null) {
+        return;
+      }
+      stdinBrokenPipe ??= setTimeout(() => {
+        finishReject(error);
+      }, stdinExitGraceMs);
+    };
     child.on("error", finishReject);
+    child.on("exit", () => {
+      if (stdinBrokenPipe) {
+        clearTimeout(stdinBrokenPipe);
+        stdinBrokenPipe = undefined;
+      }
+    });
     child.on("close", (code, signal) => {
       if (timeoutError) {
         finishReject(timeoutError);
@@ -184,7 +210,7 @@ function spawnTool(
     try {
       options.onSpawn?.(child);
       if (options.stdin !== undefined) {
-        endChildStdin(child.stdin, options.stdin, finishReject);
+        endChildStdin(child.stdin, options.stdin, onStdinError);
       }
     } catch (error) {
       finishReject(toError(error));
@@ -201,6 +227,10 @@ function normalizeArgs(tool: Tool, args: string[]): string[] {
     return args;
   }
   return ["-nostdin", ...args];
+}
+
+function isBrokenPipe(error: Error) {
+  return "code" in error && error.code === "EPIPE";
 }
 
 function toError(error: unknown): Error {
