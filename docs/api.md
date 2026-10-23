@@ -66,7 +66,7 @@ All APIs accept:
 - `timeoutMs` for bounded work. A timeout rejects with a timeout error, including when terminating the child interrupts a pending stdin write.
 - `onSpawn` for synchronous setup of the spawned child. Throwing from this callback kills the child and rejects the run. The package CLIs use this to forward host signals.
 
-If writing `stdin` fails, the call rejects with the original error and terminates the child so it cannot continue running after the call has failed.
+If writing `stdin` fails, the call rejects with the original error and terminates the child so it cannot continue running after the call has failed. A child that exits after reading only part of `stdin` (for example FFprobe, or FFmpeg with `-t` or `-frames`) settles with its exit code and output instead of a broken-pipe error.
 
 FFmpeg receives `-nostdin` automatically unless the caller already supplies it. Explicit `-i -` pipe workflows still work.
 
