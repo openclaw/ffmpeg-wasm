@@ -2,9 +2,14 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-10-23
+
+**Highlights:** Preserve successful partial-stdin media output and keep workbench results tied to the selected source.
+
 - Resolve FFmpeg/FFprobe calls that exit successfully after reading only part of a `stdin` payload, such as probing piped media or `-t`/`-frames` limits, instead of rejecting with `EPIPE` and discarding the output. Thanks @parth-garg01.
 - Ignore probe results, render output, progress, and render-save status from a replaced source, keeping the newly selected file's state intact in both workbench backends. Thanks @SebTardif.
 - Refresh Emscripten to 6.0.11, pnpm, Node types, formatting, lint, and deployment tooling while retaining Node 24+, the 48-hour dependency cooldown, and disabled dependency build scripts.
+- Use the hardened Node 24.22.1 runtime for release checks. Thanks @joshavant.
 
 ## 0.1.1 - 2026-09-24
 
