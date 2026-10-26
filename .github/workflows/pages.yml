@@ -65,11 +65,15 @@ jobs:
             pkg-config \
             yasm
 
+      - name: Select compiler Node
+        run: echo "EM_NODE_JS=$(node -p 'process.execPath')" >> "$GITHUB_ENV"
+
       - name: Setup Emscripten
         uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
         with:
-          version: ${{ env.EMSDK_VERSION }}
-          actions-cache-folder: emsdk-cache
+          emsdk-version: ${{ env.EMSDK_VERSION }}
+          version: releases-${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-compiler-cache
 
       - name: Restore build cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -80,10 +84,10 @@ jobs:
             .cache/lame
             .cache/libvpx
             .cache/emcache
-          key: pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-${{ env.FFMPEG_VERSION }}-${{ env.LAME_REF }}-${{ env.LIBVPX_REF }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
+          key: pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-node24.22.1-${{ env.FFMPEG_VERSION }}-${{ env.LAME_REF }}-${{ env.LIBVPX_REF }}-${{ hashFiles('pnpm-lock.yaml', 'scripts/build.ts') }}
           restore-keys: |
-            pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-${{ env.FFMPEG_VERSION }}-
-            pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-
+            pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-node24.22.1-${{ env.FFMPEG_VERSION }}-
+            pages-wasm-${{ runner.os }}-emsdk-${{ env.EMSDK_VERSION }}-node24.22.1-
 
       - name: Build deployable site
         run: pnpm docs:build

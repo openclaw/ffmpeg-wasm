@@ -129,9 +129,26 @@ pnpm install
 
 Required system tools for a full wasm build:
 
-- Emscripten SDK 6.0.11 with `emcc`, `em++`, `emar`, and `emranlib` on `PATH`
+- Emscripten 6.0.11 compiler tools with `emcc`, `em++`, `emar`, and `emranlib` on `PATH`
+- Patched Node 24.22.1 or newer for the wrapper and compiler JavaScript tools
 - Autotools for LAME
 - `make`, `pkg-config`, `nasm`, `yasm`
+
+Install only the compiler package through Emsdk's supported individual-tool
+route, so the SDK does not install its older bundled Node. From an Emsdk 6.0.11
+checkout, with patched Node already on `PATH`:
+
+```sh
+export EM_NODE_JS="$(node -p 'process.execPath')"
+./emsdk install releases-6.0.11
+./emsdk activate releases-6.0.11
+source ./emsdk_env.sh
+```
+
+`EM_NODE_JS` explicitly selects the patched compiler runtime; changing `PATH`
+alone does not override a Node path already recorded in `.emscripten`. CI uses a
+separate compiler-only SDK cache and runs release checks inside the same patched
+Node environment. Existing full-SDK caches are not reused.
 
 On macOS:
 
@@ -277,5 +294,10 @@ CI runs:
 - Full live wasm E2E with Emscripten, explicit API and CLI media conversions, codec/dimension assertions, native executable auditing, server and static browser workbench tests, build caching, and proof artifact uploads.
 
 CI intentionally builds from source instead of trusting checked-in wasm output. `dist/` is ignored and regenerated. The wasm job uploads `dist/`, converted media, a verification manifest, and both browser screenshots for inspection.
+
+The workspace pins the patched `workerd` 1.20261021.1 runtime for Wrangler's
+local Pages tooling while retaining the current Wrangler and Miniflare releases.
+This replaces the locally acquired TLS verifier; Cloudflare's managed production
+runtime remains supplier-owned.
 
 See [RELEASING.md](RELEASING.md) for the source-only GitHub release procedure.
