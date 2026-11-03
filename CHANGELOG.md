@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Batch main CodeQL analysis weekly while preserving PR and manual scans.
+
 ## 0.1.2 - 2026-10-23
 
 **Highlights:** Preserve successful partial-stdin media output and keep workbench results tied to the selected source.
