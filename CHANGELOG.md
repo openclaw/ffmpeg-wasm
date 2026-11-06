@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Pin the shared source-release workflow to a reviewed commit with complete release listing and exact-byte draft retry checks.
 - Batch main CodeQL analysis weekly while preserving PR and manual scans.
 
 ## 0.1.2 - 2026-10-23
