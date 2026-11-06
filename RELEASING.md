@@ -7,11 +7,15 @@ covers the browser workbench. Generated WASM is not a release asset. The workflo
 publishes frozen-commit source tar/zip archives, changelog notes, inventory, and
 `SHA256SUMS`.
 
-The `Release` workflow calls the shared OpenClaw archetype at `@v1`. It
-requires a protected `main`, matching version metadata, a dated changelog section,
-and successful independent **push** CI on the exact release commit. It verifies
-SSH-signed annotated tags against `.github/release-allowed-signers` and rejects
-moved tags or an existing GitHub Release.
+The `Release` workflow calls the shared OpenClaw archetype at the commit pinned in
+`.github/workflows/release.yml`. It requires a protected `main`, matching version
+metadata, a dated changelog section, and successful independent **push** CI on the
+exact release commit. It verifies SSH-signed annotated tags against
+`.github/release-allowed-signers` and rejects moved tags. A compatible draft can
+resume on the same release only when its existing assets match the frozen payload;
+an exact published release with matching notes and assets is verified without
+writes. Mismatches, unexpected draft assets, and ambiguous release matches are
+refused.
 
 Prepare the version and dated `## X.Y.Z - YYYY-MM-DD` changelog section in a PR,
 retain `## Unreleased`, and merge only after CI and review. After explicit release
